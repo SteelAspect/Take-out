@@ -10,6 +10,7 @@ import dev.steelaspect.containerautofill.config.Configs;
 import dev.steelaspect.containerautofill.config.GuiConfigs;
 import dev.steelaspect.containerautofill.filler.AutoFillController;
 import dev.steelaspect.containerautofill.takeitout.TakeItOutFeatures;
+import fi.dy.masa.malilib.config.options.ConfigBooleanHotkeyed;
 import fi.dy.masa.malilib.config.options.ConfigHotkey;
 import fi.dy.masa.malilib.gui.GuiBase;
 import fi.dy.masa.malilib.hotkeys.IHotkeyCallback;
@@ -29,7 +30,9 @@ public final class InputHandler implements IKeybindProvider, IHotkeyCallback {
         for (ConfigHotkey hotkey : Configs.HOTKEYS) {
             hotkey.getKeybind().setCallback(this);
         }
-        Configs.AUTO_TAKE_OUT.getKeybind().setCallback(this);
+        for (ConfigBooleanHotkeyed toggle : Configs.TOGGLES) {
+            toggle.getKeybind().setCallback(this);
+        }
     }
 
     public static InputHandler getInstance() {
@@ -41,13 +44,15 @@ public final class InputHandler implements IKeybindProvider, IHotkeyCallback {
         for (ConfigHotkey hotkey : Configs.HOTKEYS) {
             manager.addKeybindToMap(hotkey.getKeybind());
         }
-        manager.addKeybindToMap(Configs.AUTO_TAKE_OUT.getKeybind());
+        for (ConfigBooleanHotkeyed toggle : Configs.TOGGLES) {
+            manager.addKeybindToMap(toggle.getKeybind());
+        }
     }
 
     @Override
     public void addHotkeys(IKeybindManager manager) {
         List<fi.dy.masa.malilib.hotkeys.IHotkey> all = new ArrayList<>(Configs.HOTKEYS);
-        all.add(Configs.AUTO_TAKE_OUT);
+        all.addAll(Configs.TOGGLES);
         manager.addHotkeysForCategory(Reference.MOD_NAME, Reference.MOD_ID + ".hotkeys.category.generic", all);
     }
 
@@ -64,6 +69,13 @@ public final class InputHandler implements IKeybindProvider, IHotkeyCallback {
         }
         if (key == Configs.AUTO_TAKE_OUT.getKeybind()) {
             TakeItOutFeatures.toggleAutoTakeOut(client);
+            return true;
+        }
+        if (key == Configs.HIGHLIGHT_CONTAINERS.getKeybind()) {
+            Configs.HIGHLIGHT_CONTAINERS.toggleBooleanValue();
+            String messageKey = Configs.HIGHLIGHT_CONTAINERS.getBooleanValue()
+                    ? "containerautofill.message.highlight_on" : "containerautofill.message.highlight_off";
+            client.player.sendMessage(net.minecraft.text.Text.translatable(messageKey), true);
             return true;
         }
         if (key == Configs.AUTO_FILL_OPEN_CONTAINER.getKeybind()) {

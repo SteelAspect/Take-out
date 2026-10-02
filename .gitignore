@@ -5,3 +5,5 @@ run/
 out/
 .idea/
 *.iml
+server/run/
+server/build/

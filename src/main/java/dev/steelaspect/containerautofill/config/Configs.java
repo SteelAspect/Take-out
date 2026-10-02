@@ -14,6 +14,7 @@ import fi.dy.masa.malilib.config.IConfigBase;
 import fi.dy.masa.malilib.config.IConfigHandler;
 import fi.dy.masa.malilib.config.options.ConfigBoolean;
 import fi.dy.masa.malilib.config.options.ConfigBooleanHotkeyed;
+import fi.dy.masa.malilib.config.options.ConfigColor;
 import fi.dy.masa.malilib.config.options.ConfigHotkey;
 import fi.dy.masa.malilib.config.options.ConfigInteger;
 import fi.dy.masa.malilib.hotkeys.KeybindSettings;
@@ -53,6 +54,34 @@ public class Configs implements IConfigHandler {
             DEBUG_LOGGING
     );
 
+    // --- Highlight ---
+    public static final ConfigBooleanHotkeyed HIGHLIGHT_CONTAINERS = new ConfigBooleanHotkeyed("highlightContainers", true, "").apply(PREFIX);
+    public static final ConfigInteger HIGHLIGHT_RANGE = new ConfigInteger("highlightRange", 32, 4, 128).apply(PREFIX);
+    public static final ConfigBoolean HIGHLIGHT_THROUGH_WALLS = new ConfigBoolean("highlightThroughWalls", false).apply(PREFIX);
+    public static final ConfigBoolean HIGHLIGHT_SHOW_CORRECT = new ConfigBoolean("highlightShowCorrect", true).apply(PREFIX);
+    public static final ConfigBoolean HIGHLIGHT_SHOW_UNKNOWN = new ConfigBoolean("highlightShowUnknown", true).apply(PREFIX);
+    public static final ConfigColor COLOR_CORRECT = new ConfigColor("colorCorrect", "0x4033DD55").apply(PREFIX);
+    public static final ConfigColor COLOR_EMPTY = new ConfigColor("colorEmpty", "0x403399FF").apply(PREFIX);
+    public static final ConfigColor COLOR_PARTIAL = new ConfigColor("colorPartial", "0x40FFC21A").apply(PREFIX);
+    public static final ConfigColor COLOR_WRONG = new ConfigColor("colorWrong", "0x50FF3333").apply(PREFIX);
+    public static final ConfigColor COLOR_UNKNOWN = new ConfigColor("colorUnknown", "0x30A0A0A0").apply(PREFIX);
+
+    public static final ImmutableList<IConfigBase> HIGHLIGHT = ImmutableList.of(
+            HIGHLIGHT_CONTAINERS,
+            HIGHLIGHT_RANGE,
+            HIGHLIGHT_THROUGH_WALLS,
+            HIGHLIGHT_SHOW_CORRECT,
+            HIGHLIGHT_SHOW_UNKNOWN,
+            COLOR_CORRECT,
+            COLOR_EMPTY,
+            COLOR_PARTIAL,
+            COLOR_WRONG,
+            COLOR_UNKNOWN
+    );
+
+    /** Boolean options with a toggle hotkey. */
+    public static final ImmutableList<ConfigBooleanHotkeyed> TOGGLES = ImmutableList.of(AUTO_TAKE_OUT, HIGHLIGHT_CONTAINERS);
+
     // --- Hotkeys ---
     /** Fills the container whose screen is currently open. Unbound by default; only fires inside a GUI. */
     public static final ConfigHotkey AUTO_FILL_OPEN_CONTAINER = new ConfigHotkey("autoFillOpenContainer", "", KeybindSettings.GUI).apply(PREFIX);
@@ -87,6 +116,7 @@ public class Configs implements IConfigHandler {
             if (element != null && element.isJsonObject()) {
                 JsonObject root = element.getAsJsonObject();
                 ConfigUtils.readConfigBase(root, "Generic", GENERIC);
+                ConfigUtils.readConfigBase(root, "Highlight", HIGHLIGHT);
                 ConfigUtils.readConfigBase(root, "Hotkeys", HOTKEYS);
             }
         }
@@ -103,6 +133,7 @@ public class Configs implements IConfigHandler {
         }
         JsonObject root = new JsonObject();
         ConfigUtils.writeConfigBase(root, "Generic", GENERIC);
+        ConfigUtils.writeConfigBase(root, "Highlight", HIGHLIGHT);
         ConfigUtils.writeConfigBase(root, "Hotkeys", HOTKEYS);
         JsonUtils.writeJsonToFile(root, dir.resolve(CONFIG_FILE_NAME));
     }

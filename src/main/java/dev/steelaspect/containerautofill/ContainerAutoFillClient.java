@@ -15,6 +15,10 @@ import dev.steelaspect.containerautofill.takeitout.TakeItOutFeatures;
 import fi.dy.masa.malilib.config.ConfigManager;
 import fi.dy.masa.malilib.event.InitializationHandler;
 import fi.dy.masa.malilib.event.InputEventHandler;
+import fi.dy.masa.malilib.event.RenderEventHandler;
+import dev.steelaspect.containerautofill.highlight.ContainerHighlighter;
+import dev.steelaspect.containerautofill.highlight.HighlightRenderer;
+import dev.steelaspect.containerautofill.highlight.RealContainerCache;
 import fi.dy.masa.malilib.registry.Registry;
 import fi.dy.masa.malilib.util.data.ModInfo;
 import net.fabricmc.api.ClientModInitializer;
@@ -30,12 +34,14 @@ public class ContainerAutoFillClient implements ClientModInitializer {
             ConfigManager.getInstance().registerConfigHandler(Reference.MOD_ID, Configs.INSTANCE);
             Registry.CONFIG_SCREEN.registerConfigScreenFactory(new ModInfo(Reference.MOD_ID, Reference.MOD_NAME, GuiConfigs::new));
             InputEventHandler.getKeybindManager().registerKeybindProvider(InputHandler.getInstance());
+            RenderEventHandler.getInstance().registerWorldLastRenderer(HighlightRenderer.INSTANCE);
         });
 
         ClientTickEvents.END_CLIENT_TICK.register(ContainerAutoFillClient::onEndTick);
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
             AutoFillController.reset();
             ShulkerRetriever.reset();
+            ContainerHighlighter.reset();
         });
     }
 
@@ -48,5 +54,7 @@ public class ContainerAutoFillClient implements ClientModInitializer {
         ShulkerRetriever.tick(client);
         AutoFillController.tick(client);
         TakeItOutFeatures.tick(client);
+        RealContainerCache.tick(client);
+        ContainerHighlighter.tick(client);
     }
 }

@@ -6,7 +6,8 @@
  * Ported from Litematica-Container-Filler (core/LitematicaContainerReader.java,
  * core/LitematicaPlacementContainerData.java and RealContainerCache#parseNbtInventory),
  * https://github.com/MimicEnzymes/Litematica-Container-Filler, licensed LGPL-3.0-only.
- * Modified by steelaspect, 2026-10-02: single-position lookup instead of a global snapshot,
+ * Modified by steelaspect, 2026-10-02: single-position lookup instead of a global snapshot, crafter locks,
+ * block entity type compatibility (shulker colours, copper chest oxidation),
  * Litematica 0.26.16 CompoundData block entity maps, double chest halves taken from the real
  * world, block identity checks, and removal of material replacement / large barrel support.
  */
@@ -37,12 +38,13 @@ import net.minecraft.nbt.NbtList;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.registry.RegistryWrapper;
 import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
 import net.minecraft.world.World;
 
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Reads what Litematica's active placements expect inside a container.
@@ -60,13 +62,19 @@ public final class SchematicContainerReader {
         NOT_A_CONTAINER
     }
 
-    public record Result(Status status, Map<Integer, ItemStack> items, Block expectedBlock) {
+    /**
+     * @param items         expected stacks keyed by container index
+     * @param disabledSlots crafter slots the schematic has locked (empty for other containers)
+     * @param expectedBlock the schematic block (for messages)
+     */
+    public record Result(Status status, Map<Integer, ItemStack> items, Set<Integer> disabledSlots, Block expectedBlock) {
         static Result of(Status status) {
-            return new Result(status, Collections.emptyMap(), null);
+            return new Result(status, Collections.emptyMap(), Collections.emptySet(), null);
         }
     }
 
-    private record Single(BlockState state, Map<Integer, ItemStack> items) {
+    /** What the schematic holds at one block position. */
+    public record Single(BlockState state, Map<Integer, ItemStack> items, Set<Integer> disabledSlots) {
     }
 
     private SchematicContainerReader() {
@@ -82,25 +90,38 @@ public final class SchematicContainerReader {
         BlockPos[] halves = getRealContainerHalves(world, pos);
         Map<Integer, ItemStack> combined = new HashMap<>();
 
+        Set<Integer> disabled = new HashSet<>();
+
         for (int half = 0; half < halves.length; half++) {
             BlockPos halfPos = halves[half];
             Single single = readSingle(halfPos, registries);
             if (single == null) return Result.of(Status.NOT_IN_PLACEMENT);
-
-            Block realBlock = world.getBlockState(halfPos).getBlock();
-            if (single.state().getBlock() != realBlock) {
-                return new Result(Status.BLOCK_MISMATCH, Collections.emptyMap(), single.state().getBlock());
-            }
             if (!single.state().hasBlockEntity()) return Result.of(Status.NOT_A_CONTAINER);
+            if (!isCompatible(world, halfPos, single.state())) {
+                return new Result(Status.BLOCK_MISMATCH, Collections.emptyMap(), Collections.emptySet(), single.state().getBlock());
+            }
 
             int offset = half * CHEST_HALF_SIZE;
             single.items().forEach((slot, stack) -> {
                 if (halves.length > 1 && slot >= CHEST_HALF_SIZE) return;
                 combined.put(slot + offset, stack);
             });
+            disabled.addAll(single.disabledSlots());
         }
 
-        return new Result(Status.OK, combined, world.getBlockState(pos).getBlock());
+        return new Result(Status.OK, combined, disabled, world.getBlockState(pos).getBlock());
+    }
+
+    /**
+     * The real block can hold the schematic's contents if its block entity type supports the schematic
+     * block. So a red vs white shulker box, or copper chests of different oxidation, still count as the same
+     * container; a barrel where the schematic has a chest does not.
+     */
+    public static boolean isCompatible(World world, BlockPos pos, BlockState schematicState) {
+        BlockState realState = world.getBlockState(pos);
+        if (realState.getBlock() == schematicState.getBlock()) return true;
+        BlockEntity realBlockEntity = world.getBlockEntity(pos);
+        return realBlockEntity != null && realBlockEntity.getType().supports(schematicState);
     }
 
     /**
@@ -112,11 +133,12 @@ public final class SchematicContainerReader {
         if (state.getBlock() instanceof ChestBlock && state.contains(ChestBlock.CHEST_TYPE)) {
             ChestType type = state.get(ChestBlock.CHEST_TYPE);
             if (type != ChestType.SINGLE) {
-                Direction facing = state.get(ChestBlock.FACING);
-                Direction toOther = type == ChestType.LEFT ? facing.rotateYClockwise() : facing.rotateYCounterclockwise();
-                BlockPos other = pos.offset(toOther);
+                BlockPos other = pos.offset(ChestBlock.getFacing(state));
                 BlockState otherState = world.getBlockState(other);
-                if (otherState.isOf(state.getBlock()) && otherState.get(ChestBlock.CHEST_TYPE) == type.getOpposite()) {
+                // Any ChestBlock (normal, trapped, copper of any oxidation level) can be the other half.
+                if (otherState.getBlock() instanceof ChestBlock && otherState.contains(ChestBlock.CHEST_TYPE)
+                        && otherState.get(ChestBlock.CHEST_TYPE) == type.getOpposite()
+                        && otherState.get(ChestBlock.FACING) == state.get(ChestBlock.FACING)) {
                     BlockPos right = type == ChestType.RIGHT ? pos : other;
                     BlockPos left = type == ChestType.LEFT ? pos : other;
                     return new BlockPos[]{right.toImmutable(), left.toImmutable()};
@@ -132,7 +154,8 @@ public final class SchematicContainerReader {
         return single != null && single.state().hasBlockEntity();
     }
 
-    private static Single readSingle(BlockPos worldPos, RegistryWrapper.WrapperLookup registries) {
+    /** Expected contents of the schematic block at one position, or null if no enabled placement has a block there. */
+    public static Single readSingle(BlockPos worldPos, RegistryWrapper.WrapperLookup registries) {
         Single fromPlacement = readFromPlacements(worldPos, registries);
         if (fromPlacement != null) return fromPlacement;
         return readFromSchematicWorld(worldPos, registries);
@@ -168,15 +191,12 @@ public final class SchematicContainerReader {
                 BlockState state = container.get(localPos.getX(), localPos.getY(), localPos.getZ());
                 if (state == null || state.isAir()) continue;
 
-                Map<Integer, ItemStack> items = Collections.emptyMap();
                 Map<BlockPos, CompoundData> blockEntities = schematic.getBlockEntityMapForRegion(regionName);
                 CompoundData data = blockEntities != null ? blockEntities.get(localPos) : null;
-                if (data != null) {
-                    items = parseItems(DataConverterNbt.toVanillaCompound(data), registries);
-                }
+                Single single = fromNbt(state, data != null ? DataConverterNbt.toVanillaCompound(data) : null, registries);
                 Configs.debug("Schematic '{}' region '{}' local {} -> {} with {} stacks",
-                        placement.getName(), regionName, localPos, state, items.size());
-                return new Single(state, items);
+                        placement.getName(), regionName, localPos, state, single.items().size());
+                return single;
             }
         }
         return null;
@@ -189,12 +209,22 @@ public final class SchematicContainerReader {
         BlockState state = schematicWorld.getBlockState(worldPos);
         if (state.isAir()) return null;
 
-        Map<Integer, ItemStack> items = Collections.emptyMap();
         BlockEntity blockEntity = schematicWorld.getBlockEntity(worldPos);
-        if (blockEntity != null) {
-            items = parseItems(blockEntity.createNbt(registries), registries);
+        return fromNbt(state, blockEntity != null ? blockEntity.createNbt(registries) : null, registries);
+    }
+
+    public static Single fromNbt(BlockState state, NbtCompound nbt, RegistryWrapper.WrapperLookup registries) {
+        if (nbt == null) return new Single(state, Collections.emptyMap(), Collections.emptySet());
+        return new Single(state, parseItems(nbt, registries), parseDisabledSlots(nbt));
+    }
+
+    /** Crafter {@code disabled_slots} (int array). */
+    public static Set<Integer> parseDisabledSlots(NbtCompound nbt) {
+        Set<Integer> disabled = new HashSet<>();
+        for (int slot : nbt.getIntArray("disabled_slots").orElse(new int[0])) {
+            disabled.add(slot);
         }
-        return new Single(state, items);
+        return disabled;
     }
 
     private static boolean contains(Box box, BlockPos pos) {

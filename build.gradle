@@ -107,3 +107,13 @@ jar {
         rename { "${it}_${archiveSuffix}" }
     }
 }
+
+// Put the Fabric server companion jar next to the client jar in build/libs.
+def copyServerJar = tasks.register('copyServerJar', Copy) {
+    dependsOn ':server:remapJar'
+    from(project(':server').tasks.named('remapJar'))
+    into layout.buildDirectory.dir('libs')
+}
+tasks.named('build') {
+    dependsOn copyServerJar
+}

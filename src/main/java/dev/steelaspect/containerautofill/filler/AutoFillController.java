@@ -163,7 +163,7 @@ public final class AutoFillController {
             return;
         }
         Configs.debug("Starting fill of {} ({} container slots, {} expected stacks)", pos, mapper.containerSize(), result.items().size());
-        job = new ContainerFillJob(handler, pos, result.items(), mapper, closeWhenDone);
+        job = new ContainerFillJob(handler, pos, result.items(), result.disabledSlots(), mapper, closeWhenDone);
     }
 
     /** Shows why a container can't be filled. Returns true if the read result is usable. */

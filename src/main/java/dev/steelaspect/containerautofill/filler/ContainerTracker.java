@@ -56,6 +56,15 @@ public final class ContainerTracker {
         lastInteractedPos = null;
     }
 
+    /** Position bound to the open screen through the block that was used to open it (no crosshair guess). */
+    public static BlockPos getBoundPos(MinecraftClient client) {
+        if (client.player == null) return null;
+        ScreenHandler handler = client.player.currentScreenHandler;
+        if (handler == null || handler == client.player.playerScreenHandler) return null;
+        if (handler.syncId != boundSyncId) bind(handler);
+        return boundPos;
+    }
+
     /** Position of the container whose screen is open, or null if unknown. */
     public static BlockPos getOpenContainerPos(MinecraftClient client) {
         if (client.player == null || client.world == null) return null;

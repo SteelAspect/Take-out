@@ -37,18 +37,23 @@ public final class ContainerFillJob {
     private static final int MAX_ACTIONS = 4000;
     private static final int MAX_CLICKS_PER_TRANSFER = 160;
     private static final int MAX_RETRIEVAL_FAILURES = 2;
+    /** A slot that still needs items after this many transfers is rejecting them (server-side rule); skip it. */
+    private static final int MAX_TRANSFERS_PER_SLOT = 4;
 
     private final ScreenHandler handler;
     private final BlockPos pos;
     private final Map<Integer, ItemStack> expected;
+    private final Set<Integer> expectedDisabledSlots;
     private final SlotMapper mapper;
     private final boolean closeWhenDone;
 
     private final Set<Integer> touchedSlots = new HashSet<>();
     private final Set<Integer> clearAttempted = new HashSet<>();
+    private final Set<Integer> lockAttempted = new HashSet<>();
     private final Set<Integer> blockedSlots = new HashSet<>();
     private final Set<ItemMatcher.StackKey> unavailable = new HashSet<>();
     private final Map<ItemMatcher.StackKey, Integer> retrievalFailures = new HashMap<>();
+    private final Map<Integer, Integer> transfersPerSlot = new HashMap<>();
 
     private Transfer transfer;
     private RetrievalWait retrievalWait;
@@ -65,10 +70,12 @@ public final class ContainerFillJob {
     private record RetrievalWait(ItemMatcher.StackKey key, Predicate<ItemStack> matcher, int countBefore) {
     }
 
-    public ContainerFillJob(ScreenHandler handler, BlockPos pos, Map<Integer, ItemStack> expected, SlotMapper mapper, boolean closeWhenDone) {
+    public ContainerFillJob(ScreenHandler handler, BlockPos pos, Map<Integer, ItemStack> expected, Set<Integer> expectedDisabledSlots,
+                            SlotMapper mapper, boolean closeWhenDone) {
         this.handler = handler;
         this.pos = pos;
         this.expected = expected;
+        this.expectedDisabledSlots = expectedDisabledSlots;
         this.mapper = mapper;
         this.closeWhenDone = closeWhenDone;
 
@@ -154,6 +161,8 @@ public final class ContainerFillJob {
             return stashCursor(client, cursor);
         }
 
+        if (syncCrafterLocks(client, true)) return true;
+
         boolean clearWrong = Configs.CLEAR_WRONG_ITEMS.getBooleanValue();
 
         for (Map.Entry<Integer, Slot> entry : this.mapper.containerSlots().entrySet()) {
@@ -194,6 +203,11 @@ public final class ContainerFillJob {
             if (this.unavailable.contains(key)) continue;
 
             Slot source = findSource(want, need);
+            if (source != null && this.transfersPerSlot.merge(index, 1, Integer::sum) > MAX_TRANSFERS_PER_SLOT) {
+                Configs.debug("Slot {} keeps rejecting {}, skipping it", index, want);
+                this.blockedSlots.add(index);
+                continue;
+            }
             if (source != null) {
                 this.touchedSlots.add(index);
                 this.transfer = new Transfer(source.id, slot.id, want.copyWithCount(1), goal, new int[1]);
@@ -207,7 +221,36 @@ public final class ContainerFillJob {
             }
             this.unavailable.add(key);
         }
+        return syncCrafterLocks(client, false);
+    }
+
+    /**
+     * Crafters: unlock slots the schematic leaves open (before filling), and lock the slots the schematic
+     * has locked once they are empty (after filling). Uses the same packet as clicking a crafter slot.
+     */
+    private boolean syncCrafterLocks(MinecraftClient client, boolean unlockPass) {
+        if (!(this.handler instanceof CrafterScreenHandler crafter)) return false;
+        for (int index = 0; index < 9; index++) {
+            Slot slot = this.mapper.getContainerSlot(index);
+            if (slot == null) continue;
+            boolean disabled = crafter.isSlotDisabled(slot.id);
+            boolean wantDisabled = this.expectedDisabledSlots.contains(index);
+            if (unlockPass && disabled && !wantDisabled) {
+                setCrafterSlot(client, crafter, slot, true);
+                return true;
+            }
+            if (!unlockPass && !disabled && wantDisabled && !slot.hasStack() && this.lockAttempted.add(index)) {
+                setCrafterSlot(client, crafter, slot, false);
+                return true;
+            }
+        }
         return false;
+    }
+
+    private void setCrafterSlot(MinecraftClient client, CrafterScreenHandler crafter, Slot slot, boolean enabled) {
+        Configs.debug("Crafter slot {} -> {}", slot.id, enabled ? "enabled" : "disabled");
+        crafter.setSlotEnabled(slot.id, enabled);
+        client.interactionManager.slotChangedState(slot.id, crafter.syncId, enabled);
     }
 
     private boolean continueTransfer(MinecraftClient client) {
@@ -221,6 +264,7 @@ public final class ContainerFillJob {
         if (++t.clicks()[0] > MAX_CLICKS_PER_TRANSFER) return false;
 
         int goal = Math.min(t.goal(), s + tc + c);
+        Configs.debug("transfer {} -> {}: source={} target={} cursor={} goal={}", t.sourceSlotId(), t.targetSlotId(), s, tc, c, goal);
         ClickPlanner.Click next = ClickPlanner.firstClick(s, tc, c, goal,
                 source.getMaxItemCount(t.item()), target.getMaxItemCount(t.item()));
         if (next == null) return false;

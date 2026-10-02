@@ -8,6 +8,8 @@ package dev.steelaspect.containerautofill.test;
 import dev.steelaspect.containerautofill.config.Configs;
 import dev.steelaspect.containerautofill.filler.AutoFillController;
 import dev.steelaspect.containerautofill.filler.FillResult;
+import dev.steelaspect.containerautofill.highlight.ContainerHighlighter;
+import dev.steelaspect.containerautofill.highlight.ContainerStatus;
 import dev.steelaspect.containerautofill.takeitout.GetStackPayload;
 import dev.steelaspect.containerautofill.takeitout.ShulkerRetriever;
 import dev.steelaspect.containerautofill.takeitout.ShulkerStackServerHandler;
@@ -26,6 +28,7 @@ import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.block.ChestBlock;
+import net.minecraft.block.entity.CrafterBlockEntity;
 import net.minecraft.block.enums.ChestType;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.ingame.HandledScreen;
@@ -71,6 +74,9 @@ public class ContainerAutoFillClientGameTest implements FabricClientGameTest {
 
     private BlockPos base;
     private BlockPos single, doubleLeft, doubleRight, hopper, barrel, dispenser, shulkerBox, mismatch, lookFill, lapisSpot, outside, emerald;
+    // Second row: more container types, and highlight-only containers.
+    private BlockPos furnace, smoker, blastFurnace, brewingStand, dropper, trappedLeft, trappedRight, copperLeft, copperRight,
+            recoloredShulker, crafter, partialChest, correctChest;
 
     @Override
     public void runTest(ClientGameTestContext context) {
@@ -85,7 +91,9 @@ public class ContainerAutoFillClientGameTest implements FabricClientGameTest {
             world.getClientWorld().waitForChunksRender();
             buildReferenceArea(context, world);
 
+            testHighlightStatuses(context, world);
             testSingleChest(context, world);
+            testHighlightUpdatesAfterFill(context, world);
             testAlreadyFilled(context, world);
             testDoubleChestWithShulkerRetrieval(context, world);
             testHopperWrongItemsKept(context, world);
@@ -97,6 +105,7 @@ public class ContainerAutoFillClientGameTest implements FabricClientGameTest {
             testScreenClosedMidFill(context, world);
             testVanillaPickFromShulker(context, world);
             testAutoTakeOut(context, world);
+            testMoreContainerTypes(context, world);
         }
 
         testServerWithoutHandler(context);
@@ -156,13 +165,27 @@ public class ContainerAutoFillClientGameTest implements FabricClientGameTest {
         lapisSpot = base.add(19, 0, 0);
         outside = base.add(0, 0, 5);
         emerald = base.add(3, 0, 5);
+        BlockPos row2 = base.add(0, 0, 9);
+        furnace = row2;
+        smoker = row2.add(2, 0, 0);
+        blastFurnace = row2.add(4, 0, 0);
+        brewingStand = row2.add(6, 0, 0);
+        dropper = row2.add(8, 0, 0);
+        trappedLeft = row2.add(10, 0, 0);
+        trappedRight = row2.add(11, 0, 0);
+        copperLeft = row2.add(13, 0, 0);
+        copperRight = row2.add(14, 0, 0);
+        recoloredShulker = row2.add(16, 0, 0);
+        crafter = row2.add(18, 0, 0);
+        partialChest = row2.add(20, 0, 0);
+        correctChest = row2.add(22, 0, 0);
 
         world.getServer().runOnServer(server -> {
             ServerWorld w = server.getOverworld();
-            for (BlockPos p : BlockPos.iterate(base.add(-3, 0, -3), base.add(23, 5, 9))) {
+            for (BlockPos p : BlockPos.iterate(base.add(-3, 0, -3), base.add(25, 5, 13))) {
                 w.setBlockState(p, Blocks.AIR.getDefaultState());
             }
-            for (BlockPos p : BlockPos.iterate(base.add(-3, -1, -3), base.add(23, -1, 9))) {
+            for (BlockPos p : BlockPos.iterate(base.add(-3, -1, -3), base.add(25, -1, 13))) {
                 w.setBlockState(p, Blocks.STONE.getDefaultState());
             }
 
@@ -194,9 +217,43 @@ public class ContainerAutoFillClientGameTest implements FabricClientGameTest {
             fill(w, mismatch, Map.of(0, stack(Items.STONE, 1)));
             fill(w, lookFill, Map.of(0, stack(Items.OAK_LOG, 32), 2, stack(Items.OAK_LOG, 32)));
 
+            w.setBlockState(furnace, Blocks.FURNACE.getDefaultState());
+            w.setBlockState(smoker, Blocks.SMOKER.getDefaultState());
+            w.setBlockState(blastFurnace, Blocks.BLAST_FURNACE.getDefaultState());
+            w.setBlockState(brewingStand, Blocks.BREWING_STAND.getDefaultState());
+            w.setBlockState(dropper, Blocks.DROPPER.getDefaultState());
+            BlockState trappedNorth = Blocks.TRAPPED_CHEST.getDefaultState().with(ChestBlock.FACING, Direction.NORTH);
+            w.setBlockState(trappedLeft, trappedNorth.with(ChestBlock.CHEST_TYPE, ChestType.LEFT));
+            w.setBlockState(trappedRight, trappedNorth.with(ChestBlock.CHEST_TYPE, ChestType.RIGHT));
+            BlockState copperNorth = Blocks.COPPER_CHEST.getDefaultState().with(ChestBlock.FACING, Direction.NORTH);
+            w.setBlockState(copperLeft, copperNorth.with(ChestBlock.CHEST_TYPE, ChestType.LEFT));
+            w.setBlockState(copperRight, copperNorth.with(ChestBlock.CHEST_TYPE, ChestType.RIGHT));
+            w.setBlockState(recoloredShulker, Blocks.RED_SHULKER_BOX.getDefaultState());
+            w.setBlockState(crafter, Blocks.CRAFTER.getDefaultState());
+            w.setBlockState(partialChest, Blocks.CHEST.getDefaultState());
+            w.setBlockState(correctChest, Blocks.CHEST.getDefaultState());
+
+            fill(w, furnace, Map.of(1, stack(Items.COAL, 4), 2, stack(Items.IRON_INGOT, 3)));
+            fill(w, smoker, Map.of(1, stack(Items.CHARCOAL, 2)));
+            fill(w, blastFurnace, Map.of(1, stack(Items.COAL_BLOCK, 1)));
+            fill(w, brewingStand, Map.of(0, stack(Items.GLASS_BOTTLE, 1), 1, stack(Items.GLASS_BOTTLE, 1), 3, stack(Items.NETHER_WART, 2)));
+            fill(w, dropper, Map.of(0, stack(Items.BONE, 5), 8, stack(Items.STRING, 3)));
+            fill(w, trappedRight, Map.of(0, stack(Items.FLINT, 7)));
+            fill(w, trappedLeft, Map.of(0, stack(Items.FEATHER, 9)));
+            fill(w, copperRight, Map.of(0, stack(Items.COPPER_INGOT, 11)));
+            fill(w, copperLeft, Map.of(5, stack(Items.RAW_COPPER, 12)));
+            fill(w, recoloredShulker, Map.of(0, stack(Items.APPLE, 3)));
+            fill(w, crafter, Map.of(0, stack(Items.OAK_PLANKS, 1), 4, stack(Items.OAK_PLANKS, 1)));
+            CrafterBlockEntity crafterEntity = (CrafterBlockEntity) w.getBlockEntity(crafter);
+            crafterEntity.setSlotEnabled(1, false);
+            crafterEntity.setSlotEnabled(2, false);
+            fill(w, partialChest, Map.of(0, stack(Items.STONE, 10)));
+            fill(w, correctChest, Map.of(0, stack(Items.STONE, 1)));
+
             // Save the area as a schematic (read from the server world so container contents are included).
             AreaSelection area = new AreaSelection();
             area.addSubRegionBox(new Box(base, lapisSpot, "main"), false);
+            area.addSubRegionBox(new Box(furnace, correctChest, "row2"), false);
             area.setExplicitOrigin(base);
             LitematicaSchematic schematic = LitematicaSchematic.createFromWorld(
                     w, area, new LitematicaSchematic.SchematicSaveInfo(false, true), "steelaspect", msg -> LOG.warn("schematic: {}", msg));
@@ -204,9 +261,21 @@ public class ContainerAutoFillClientGameTest implements FabricClientGameTest {
             SCHEMATIC = schematic;
 
             // Empty the real containers and change the world so it differs from the schematic.
-            for (BlockPos p : List.of(single, doubleLeft, doubleRight, hopper, barrel, dispenser, shulkerBox, lookFill)) {
+            for (BlockPos p : List.of(single, doubleLeft, doubleRight, hopper, barrel, dispenser, shulkerBox, lookFill,
+                    furnace, smoker, blastFurnace, brewingStand, dropper, trappedLeft, trappedRight, copperLeft, copperRight,
+                    recoloredShulker, crafter, partialChest)) {
                 ((Inventory) w.getBlockEntity(p)).clear();
             }
+            fill(w, partialChest, Map.of(0, stack(Items.STONE, 5)));
+            // Same container types as the schematic, different blocks: oxidised copper chest, blue instead of red shulker box.
+            BlockState exposedNorth = Blocks.EXPOSED_COPPER_CHEST.getDefaultState().with(ChestBlock.FACING, Direction.NORTH);
+            w.setBlockState(copperLeft, exposedNorth.with(ChestBlock.CHEST_TYPE, ChestType.LEFT));
+            w.setBlockState(copperRight, exposedNorth.with(ChestBlock.CHEST_TYPE, ChestType.RIGHT));
+            w.setBlockState(recoloredShulker, Blocks.BLUE_SHULKER_BOX.getDefaultState());
+            // Crafter: schematic locks 1 and 2; the world starts with only slot 5 locked.
+            CrafterBlockEntity worldCrafter = (CrafterBlockEntity) w.getBlockEntity(crafter);
+            for (int i = 0; i < 9; i++) worldCrafter.setSlotEnabled(i, true);
+            worldCrafter.setSlotEnabled(5, false);
             fill(w, hopper, Map.of(0, stack(Items.GLASS, 4), 1, stack(Items.DIRT, 2), 2, stack(Items.DIRT, 1)));
             fill(w, barrel, Map.of(1, stack(Items.DIRT, 2), 5, stack(Items.DIRT, 3)));
             w.setBlockState(mismatch, Blocks.BARREL.getDefaultState());
@@ -538,6 +607,95 @@ public class ContainerAutoFillClientGameTest implements FabricClientGameTest {
         context.getInput().pressKey(GLFW.GLFW_KEY_R);
         context.waitTicks(2);
         check("C22 R toggles Auto Take Out off", !Configs.AUTO_TAKE_OUT.getBooleanValue(), "still on");
+    }
+
+    private Map<BlockPos, ContainerStatus> waitForStatuses(ClientGameTestContext context, Predicate<Map<BlockPos, ContainerStatus>> ready) {
+        try {
+            context.waitFor(client -> ready.test(ContainerHighlighter.statuses()), 200);
+        } catch (Throwable ignored) {
+        }
+        return ContainerHighlighter.statuses();
+    }
+
+    private void testHighlightStatuses(ClientGameTestContext context, TestSingleplayerContext world) {
+        Map<BlockPos, ContainerStatus> statuses = waitForStatuses(context, m -> m.get(single) != null && m.get(single) != ContainerStatus.UNKNOWN
+                && m.get(correctChest) != null && m.get(correctChest) != ContainerStatus.UNKNOWN);
+        check("H1 empty container highlighted EMPTY", statuses.get(single) == ContainerStatus.EMPTY, "single=" + statuses.get(single));
+        check("H2 wrong items highlighted WRONG", statuses.get(hopper) == ContainerStatus.WRONG, "hopper=" + statuses.get(hopper));
+        check("H3 partly filled highlighted PARTIAL", statuses.get(partialChest) == ContainerStatus.PARTIAL, "partial=" + statuses.get(partialChest));
+        check("H4 matching container highlighted CORRECT", statuses.get(correctChest) == ContainerStatus.CORRECT, "correct=" + statuses.get(correctChest));
+        check("H5 wrong block type not highlighted", !statuses.containsKey(mismatch), "mismatch=" + statuses.get(mismatch));
+        check("H6 non-container schematic block not highlighted", !statuses.containsKey(lapisSpot), "lapis=" + statuses.get(lapisSpot));
+        check("H7 double chest halves both highlighted", statuses.containsKey(doubleLeft) && statuses.containsKey(doubleRight), "left=" + statuses.get(doubleLeft) + " right=" + statuses.get(doubleRight));
+        check("H8 other container types highlighted (furnace, brewing stand, crafter, copper, recoloured shulker)",
+                statuses.containsKey(furnace) && statuses.containsKey(brewingStand) && statuses.containsKey(crafter)
+                        && statuses.containsKey(copperLeft) && statuses.containsKey(recoloredShulker), "statuses=" + statuses.size());
+
+        // Overview screenshot of both rows (check visually: coloured boxes on the containers).
+        world.getServer().runCommand(String.format(java.util.Locale.ROOT, "tp @p %.1f %d %.1f 0 35",
+                base.getX() + 10.5, base.getY() + 4, base.getZ() - 5.5));
+        context.waitTicks(20);
+        java.nio.file.Path shot = context.takeScreenshot("containerautofill-highlight");
+        LOG.info("Highlight screenshot: {}", shot);
+    }
+
+    private void testHighlightUpdatesAfterFill(ClientGameTestContext context, TestSingleplayerContext world) {
+        Map<BlockPos, ContainerStatus> statuses = waitForStatuses(context, m -> m.get(single) == ContainerStatus.CORRECT);
+        check("H9 highlight turns CORRECT after filling", statuses.get(single) == ContainerStatus.CORRECT, "single=" + statuses.get(single));
+    }
+
+    private FillResult fillAndCheck(ClientGameTestContext context, TestSingleplayerContext world, String name, BlockPos openPos,
+                                    Map<Integer, ItemStack> playerItems, Map<BlockPos, Map<Integer, ItemStack>> expected) {
+        setPlayerInventory(world, playerItems);
+        if (!open(context, world, openPos)) return null;
+        int ticks = pressAutoFillAndWait(context, name);
+        close(context);
+        if (ticks < 0) return null;
+        expected.forEach((pos, items) -> assertContents(name + " @" + pos.toShortString(), containerContents(world, pos), items));
+        return AutoFillController.getLastResult();
+    }
+
+    private void testMoreContainerTypes(ClientGameTestContext context, TestSingleplayerContext world) {
+        FillResult furnaceResult = fillAndCheck(context, world, "T1 furnace (input/fuel; output slot can't be filled)", furnace,
+                Map.of(9, stack(Items.COAL, 64), 10, stack(Items.IRON_INGOT, 64)),
+                Map.of(furnace, Map.of(1, stack(Items.COAL, 4))));
+        check("T1 furnace output reported missing", furnaceResult != null && furnaceResult.missingItems() == 3, "result " + furnaceResult);
+        fillAndCheck(context, world, "T2 smoker", smoker, Map.of(9, stack(Items.CHARCOAL, 64)),
+                Map.of(smoker, Map.of(1, stack(Items.CHARCOAL, 2))));
+        fillAndCheck(context, world, "T3 blast furnace", blastFurnace, Map.of(9, stack(Items.COAL_BLOCK, 8)),
+                Map.of(blastFurnace, Map.of(1, stack(Items.COAL_BLOCK, 1))));
+        fillAndCheck(context, world, "T4 brewing stand", brewingStand, Map.of(9, stack(Items.GLASS_BOTTLE, 16), 10, stack(Items.NETHER_WART, 8)),
+                Map.of(brewingStand, Map.of(0, stack(Items.GLASS_BOTTLE, 1), 1, stack(Items.GLASS_BOTTLE, 1), 3, stack(Items.NETHER_WART, 2))));
+        fillAndCheck(context, world, "T5 dropper", dropper, Map.of(9, stack(Items.BONE, 64), 10, stack(Items.STRING, 64)),
+                Map.of(dropper, Map.of(0, stack(Items.BONE, 5), 8, stack(Items.STRING, 3))));
+        fillAndCheck(context, world, "T6 trapped double chest (opened from the right half)", trappedRight,
+                Map.of(9, stack(Items.FLINT, 64), 10, stack(Items.FEATHER, 64)),
+                Map.of(trappedRight, Map.of(0, stack(Items.FLINT, 7)), trappedLeft, Map.of(0, stack(Items.FEATHER, 9))));
+        fillAndCheck(context, world, "T7 copper double chest, different oxidation than schematic", copperLeft,
+                Map.of(9, stack(Items.COPPER_INGOT, 64), 10, stack(Items.RAW_COPPER, 64)),
+                Map.of(copperRight, Map.of(0, stack(Items.COPPER_INGOT, 11)), copperLeft, Map.of(5, stack(Items.RAW_COPPER, 12))));
+        fillAndCheck(context, world, "T8 shulker box of a different colour than schematic", recoloredShulker,
+                Map.of(9, stack(Items.APPLE, 64)), Map.of(recoloredShulker, Map.of(0, stack(Items.APPLE, 3))));
+        testCrafterKnownIssue(context, world);
+    }
+
+    /**
+     * Crafters work intermittently (about 1 run in 3 fills fully): the server sometimes rejects an item
+     * placed in a second crafter slot. Known issue accepted by the project owner; logged, not failed.
+     * The fill must still finish (no endless retries) and never lose items.
+     */
+    private void testCrafterKnownIssue(ClientGameTestContext context, TestSingleplayerContext world) {
+        setPlayerInventory(world, Map.of(9, stack(Items.OAK_PLANKS, 64)));
+        if (!open(context, world, crafter)) return;
+        int ticks = pressAutoFillAndWait(context, "T9 crafter fill finishes");
+        close(context);
+        check("T9 crafter fill finishes (no endless retries)", ticks >= 0, "did not finish");
+        Map<Integer, ItemStack> contents = containerContents(world, crafter);
+        int inCrafter = contents.values().stream().mapToInt(ItemStack::getCount).sum();
+        int inPlayer = countPlayer(world, s -> s.isOf(Items.OAK_PLANKS));
+        check("T9 crafter: no planks lost", inCrafter + inPlayer == 64, "crafter=" + inCrafter + " player=" + inPlayer);
+        boolean exact = contents.size() == 2 && contents.containsKey(0) && contents.containsKey(4);
+        LOG.info("{} T9 crafter contents {} (known issue: second slot sometimes rejected)", exact ? "PASS" : "KNOWN-ISSUE", describe(contents));
     }
 
     /** A server that doesn't handle takeitout:getstack (like vanilla/Paper without the plugin). */

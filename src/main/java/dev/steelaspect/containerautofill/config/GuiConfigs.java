@@ -45,17 +45,22 @@ public class GuiConfigs extends GuiConfigsBase {
 
     @Override
     protected int getConfigWidth() {
-        return tab == Tab.GENERIC ? 120 : 204;
+        return tab == Tab.HOTKEYS ? 204 : 120;
     }
 
     @Override
     public List<ConfigOptionWrapper> getConfigs() {
-        List<? extends IConfigBase> configs = tab == Tab.GENERIC ? Configs.GENERIC : Configs.HOTKEYS;
+        List<? extends IConfigBase> configs = switch (tab) {
+            case GENERIC -> Configs.GENERIC;
+            case HIGHLIGHT -> Configs.HIGHLIGHT;
+            case HOTKEYS -> Configs.HOTKEYS;
+        };
         return ConfigOptionWrapper.createFor(configs);
     }
 
     private enum Tab {
         GENERIC(Reference.MOD_ID + ".gui.button.config_gui.generic"),
+        HIGHLIGHT(Reference.MOD_ID + ".gui.button.config_gui.highlight"),
         HOTKEYS(Reference.MOD_ID + ".gui.button.config_gui.hotkeys");
 
         private final String translationKey;
