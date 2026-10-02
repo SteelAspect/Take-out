@@ -79,6 +79,11 @@
 | P5 | Same, Single-item Buffer 3 | As P3 with the buffer at 3 | All 3 placed; spare stone at most one top-up (3), nothing lost |
 | R1–R3 | Hotbar refill | Place your last cobblestone / dirt / stone with more in the inventory / only in a carried shulker / only in a linked chest | The slot is refilled (10 cobblestone from the inventory, 30 dirt from the shulker, stone from storage) |
 | R4–R5 | Hotbar refill off / drop | Same with Hotbar Refill off; drop the last plank with Q | Slot stays empty, nothing moved |
+| K1 | Restock, rest of the mod off | Enable Mod, shulker pick, linked storage, hotbar refill all off; 5 fireworks in the offhand; box named "Restock Fireworks" with 64 | Offhand 64, box keeps 5 |
+| K2 | Restock from ender chest | 10 cobblestone in hotbar slot 3; box named "restock" with 64 in the ender chest | Slot 64, ender box keeps 10 |
+| K3–K4 | Not restocked | Box without the name; a stack of 20 (threshold 16) | Nothing changes |
+| K5 | Last item used | Threshold 1, place your last cobblestone | Slot refilled to 64 from the restock box |
+| K6 | Restock off | Restock off, offhand 5 fireworks, restock box | Offhand stays 5 |
 | S9 | Dump | Dump key with cobblestone/dirt in main inventory, torches in hotbar | Main inventory moved into the dump chest, hotbar kept |
 | S10–S12 | Look At, groups | Look At iron; new group; switch back; share + import | Marked; group empty then restored; import copies all entries |
 
@@ -115,3 +120,4 @@ Record each run here (date, version, environment, pass/fail per case).
 | 2026-10-02 | 1.0.0+1.21.11 | Cloud container, client gametests under Xvfb | Full suite 53/53 + 34/34 (crafter known issue logged). Speed: single-item pull 1.1 ticks avg (was 1.5); easy place single-item, 3 blocks: 4 ticks with exactly 3 items taken (was 69 ticks and 4 taken) |
 | 2026-10-02 | 1.0.0+1.21.11 | Cloud container, client gametests under Xvfb | Full suite 53/53 + 35/35. Single-item Buffer: buffer 1 places 3 blocks in 5 ticks (3 taken), buffer 3 in 3 ticks (3 taken, none spare) |
 | 2026-10-02 | 1.0.0+1.21.11 | Cloud container, client gametests under Xvfb | Full suite 53/53 + 40/40 (hotbar refill R1–R5 added; crafter known issue logged) |
+| 2026-10-02 | 1.0.0+1.21.11 | Cloud container, client gametests under Xvfb | Full suite 53/53 + 46/46 (Restock K1–K6 added; offhand restocked in 3 ticks with the rest of the mod off) |

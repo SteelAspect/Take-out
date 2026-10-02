@@ -17,6 +17,7 @@ import fi.dy.masa.malilib.config.options.ConfigBooleanHotkeyed;
 import fi.dy.masa.malilib.config.options.ConfigColor;
 import fi.dy.masa.malilib.config.options.ConfigHotkey;
 import fi.dy.masa.malilib.config.options.ConfigInteger;
+import fi.dy.masa.malilib.config.options.ConfigString;
 import fi.dy.masa.malilib.hotkeys.KeybindSettings;
 import fi.dy.masa.malilib.util.data.json.JsonUtils;
 import net.fabricmc.loader.api.FabricLoader;
@@ -84,6 +85,25 @@ public class Configs implements IConfigHandler {
             BOX_SELECT_CREATES_NEW_GROUP
     );
 
+    // --- Restock (own page, independent of every other option) ---
+    public static final ConfigBooleanHotkeyed RESTOCK_ENABLED = new ConfigBooleanHotkeyed("restockEnabled", true, "").apply(PREFIX);
+    public static final ConfigString RESTOCK_NAME = new ConfigString("restockName", "restock").apply(PREFIX);
+    public static final ConfigInteger RESTOCK_THRESHOLD = new ConfigInteger("restockThreshold", 16, 1, 63).apply(PREFIX);
+    public static final ConfigBoolean RESTOCK_OFFHAND = new ConfigBoolean("restockOffhand", true).apply(PREFIX);
+    public static final ConfigBoolean RESTOCK_FROM_INVENTORY = new ConfigBoolean("restockFromInventory", true).apply(PREFIX);
+    public static final ConfigBoolean RESTOCK_FROM_ENDER_CHEST = new ConfigBoolean("restockFromEnderChest", true).apply(PREFIX);
+    public static final ConfigBoolean RESTOCK_WARN_EMPTY = new ConfigBoolean("restockWarnEmpty", true).apply(PREFIX);
+
+    public static final ImmutableList<IConfigBase> RESTOCK = ImmutableList.of(
+            RESTOCK_ENABLED,
+            RESTOCK_NAME,
+            RESTOCK_THRESHOLD,
+            RESTOCK_OFFHAND,
+            RESTOCK_FROM_INVENTORY,
+            RESTOCK_FROM_ENDER_CHEST,
+            RESTOCK_WARN_EMPTY
+    );
+
     // --- Highlight ---
     public static final ConfigBooleanHotkeyed HIGHLIGHT_CONTAINERS = new ConfigBooleanHotkeyed("highlightContainers", true, "").apply(PREFIX);
     public static final ConfigInteger HIGHLIGHT_RANGE = new ConfigInteger("highlightRange", 32, 4, 128).apply(PREFIX);
@@ -110,7 +130,7 @@ public class Configs implements IConfigHandler {
     );
 
     /** Boolean options with a toggle hotkey. */
-    public static final ImmutableList<ConfigBooleanHotkeyed> TOGGLES = ImmutableList.of(AUTO_TAKE_OUT, HIGHLIGHT_CONTAINERS, SINGLE_ITEM_MODE, LINKED_OUTLINES, HOTBAR_REFILL);
+    public static final ImmutableList<ConfigBooleanHotkeyed> TOGGLES = ImmutableList.of(AUTO_TAKE_OUT, HIGHLIGHT_CONTAINERS, SINGLE_ITEM_MODE, LINKED_OUTLINES, HOTBAR_REFILL, RESTOCK_ENABLED);
 
     // --- Hotkeys ---
     /** Fills the container whose screen is currently open. Unbound by default; only fires inside a GUI. */
@@ -162,6 +182,7 @@ public class Configs implements IConfigHandler {
                 ConfigUtils.readConfigBase(root, "Generic", TAKEITOUT); // files saved before the TakeItOut tab existed
                 ConfigUtils.readConfigBase(root, "TakeItOut", TAKEITOUT);
                 ConfigUtils.readConfigBase(root, "Highlight", HIGHLIGHT);
+                ConfigUtils.readConfigBase(root, "Restock", RESTOCK);
                 ConfigUtils.readConfigBase(root, "Hotkeys", HOTKEYS);
             }
         }
@@ -180,6 +201,7 @@ public class Configs implements IConfigHandler {
         ConfigUtils.writeConfigBase(root, "Generic", GENERIC);
         ConfigUtils.writeConfigBase(root, "TakeItOut", TAKEITOUT);
         ConfigUtils.writeConfigBase(root, "Highlight", HIGHLIGHT);
+        ConfigUtils.writeConfigBase(root, "Restock", RESTOCK);
         ConfigUtils.writeConfigBase(root, "Hotkeys", HOTKEYS);
         JsonUtils.writeJsonToFile(root, dir.resolve(CONFIG_FILE_NAME));
     }

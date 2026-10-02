@@ -11,6 +11,8 @@ import dev.steelaspect.containerautofill.filler.AutoFillController;
 import dev.steelaspect.containerautofill.filler.ContainerTracker;
 import dev.steelaspect.containerautofill.input.InputHandler;
 import dev.steelaspect.containerautofill.takeitout.ShulkerRetriever;
+import dev.steelaspect.containerautofill.network.RestockPayloads;
+import dev.steelaspect.containerautofill.restock.Restock;
 import dev.steelaspect.containerautofill.takeitout.HotbarRefill;
 import dev.steelaspect.containerautofill.takeitout.TakeItOutFeatures;
 import fi.dy.masa.malilib.config.ConfigManager;
@@ -48,6 +50,7 @@ public class ContainerAutoFillClient implements ClientModInitializer {
 
         ClientTickEvents.END_CLIENT_TICK.register(ContainerAutoFillClient::onEndTick);
         ClientPlayNetworking.registerGlobalReceiver(StoragePayloads.Contents.ID, (payload, context) -> StorageContents.onContents(payload));
+        ClientPlayNetworking.registerGlobalReceiver(RestockPayloads.Result.ID, (payload, context) -> Restock.onResult(context.client(), payload));
         ClientPlayNetworking.registerGlobalReceiver(StoragePayloads.Taken.ID, (payload, context) -> {
             switch (StorageRetriever.onTaken(context.client(), payload)) {
                 case ARRIVED -> TakeItOutFeatures.onStorageArrived(context.client());
@@ -67,12 +70,15 @@ public class ContainerAutoFillClient implements ClientModInitializer {
             StorageRetriever.reset();
             TakeItOutFeatures.reset();
             HotbarRefill.reset();
+            Restock.reset();
             StorageContents.clear();
             StorageStore.unload();
         });
     }
 
     private static void onEndTick(MinecraftClient client) {
+        // Restock has its own on/off switch on its own config page and runs even with the rest of the mod off.
+        Restock.tick(client);
         if (!Configs.ENABLE_MOD.getBooleanValue()) {
             if (AutoFillController.isRunning()) AutoFillController.reset();
             return;

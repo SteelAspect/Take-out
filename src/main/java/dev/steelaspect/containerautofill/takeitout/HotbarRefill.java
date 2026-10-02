@@ -72,6 +72,12 @@ public final class HotbarRefill {
         PlayerInventory inventory = client.player.getInventory();
         // The slot must still be the empty, selected one (the player didn't switch or put something there).
         if (inventory.getSelectedSlot() != slot || !inventory.getStack(slot).isEmpty()) return;
+        if (dev.steelaspect.containerautofill.restock.Restock.isPending(slot)) {
+            // Restock asked the server first; only step in if no restock box had the item.
+            wanted = item;
+            wantedSlot = slot;
+            return;
+        }
 
         Predicate<ItemStack> matcher = s -> ItemStack.areItemsAndComponentsEqual(s, item);
         // 1. Same item elsewhere in the inventory: swap it into the slot (normal inventory click).

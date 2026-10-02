@@ -82,6 +82,7 @@ public class StorageGameTest implements FabricClientGameTest {
             testPickBlockFromStorage(context, world);
             testPullSpeed(context, world);
             testHotbarRefill(context, world);
+            testRestock(context, world);
             testDump(context, world);
             testInstantFill(context, world);
             testAreaFillAndServerStatus(context, world);
@@ -462,6 +463,103 @@ public class StorageGameTest implements FabricClientGameTest {
         check("R5 dropping the last item does not refill", dropped, "slot 0 refilled after a drop: " + context.computeOnClient(client ->
                 client.player.getInventory().getStack(0) + " / slot20 " + client.player.getInventory().getStack(20)));
         world.getServer().runCommand("kill @e[type=item]");
+    }
+
+    private static ItemStack shulkerWith(String name, int innerSlot, ItemStack content) {
+        ItemStack box = new ItemStack(Items.ORANGE_SHULKER_BOX);
+        net.minecraft.util.collection.DefaultedList<ItemStack> inner = net.minecraft.util.collection.DefaultedList.ofSize(27, ItemStack.EMPTY);
+        inner.set(innerSlot, content);
+        box.set(DataComponentTypes.CONTAINER, net.minecraft.component.type.ContainerComponent.fromStacks(inner));
+        if (name != null) box.set(DataComponentTypes.CUSTOM_NAME, Text.literal(name));
+        return box;
+    }
+
+    private int innerCount(TestSingleplayerContext world, boolean enderChest, int slot, Item item) {
+        return world.getServer().computeOnServer(server -> {
+            ServerPlayerEntity player = player(server);
+            ItemStack box = enderChest ? player.getEnderChestInventory().getStack(slot) : player.getInventory().getStack(slot);
+            var contents = dev.steelaspect.containerautofill.takeitout.ShulkerUtil.getContents(box);
+            if (contents == null) return -1;
+            return contents.stream().filter(st -> st.isOf(item)).mapToInt(ItemStack::getCount).sum();
+        });
+    }
+
+    private int clientCount(ClientGameTestContext context, int slot) {
+        return context.computeOnClient(client -> client.player.getInventory().getStack(slot).getCount());
+    }
+
+    private int waitForCount(ClientGameTestContext context, int slot, int count) {
+        try {
+            return context.waitFor(client -> client.player.getInventory().getStack(slot).getCount() == count, 60);
+        } catch (Throwable t) {
+            return -1;
+        }
+    }
+
+    /** K1-K6: Restock from named shulker boxes in the inventory and the ender chest. */
+    private void testRestock(ClientGameTestContext context, TestSingleplayerContext world) {
+        // K1: everything else in the mod off; offhand fireworks restocked from an inventory box named "Restock Fireworks".
+        context.runOnClient(client -> {
+            Configs.ENABLE_MOD.setBooleanValue(false);
+            Configs.SHULKER_PICK_BLOCK.setBooleanValue(false);
+            Configs.USE_LINKED_CONTAINERS.setBooleanValue(false);
+            Configs.HOTBAR_REFILL.setBooleanValue(false);
+            Configs.RESTOCK_ENABLED.setBooleanValue(true);
+        });
+        context.runOnClient(client -> client.player.getInventory().setSelectedSlot(0));
+        setPlayerInventory(world, Map.of(40, stack(Items.FIREWORK_ROCKET, 5), 12, shulkerWith("Restock Fireworks", 3, stack(Items.FIREWORK_ROCKET, 64))));
+        int ticks = waitForCount(context, 40, 64);
+        LOG.info("SPEED K1 offhand restocked after {} ticks", ticks);
+        check("K1 offhand fireworks topped up to 64 from an inventory restock box, rest of the mod off",
+                ticks >= 0 && innerCount(world, false, 12, Items.FIREWORK_ROCKET) == 5,
+                "offhand=" + clientCount(context, 40) + " box=" + innerCount(world, false, 12, Items.FIREWORK_ROCKET));
+        context.runOnClient(client -> Configs.ENABLE_MOD.setBooleanValue(true));
+
+        // K2: hotbar stack restocked from a restock box inside the ender chest.
+        world.getServer().runOnServer(server -> player(server).getEnderChestInventory().setStack(0, shulkerWith("restock", 0, stack(Items.COBBLESTONE, 64))));
+        setPlayerInventory(world, Map.of(2, stack(Items.COBBLESTONE, 10)));
+        ticks = waitForCount(context, 2, 64);
+        check("K2 hotbar cobblestone topped up from a restock box in the ender chest",
+                ticks >= 0 && innerCount(world, true, 0, Items.COBBLESTONE) == 10,
+                "slot2=" + clientCount(context, 2) + " ender box=" + innerCount(world, true, 0, Items.COBBLESTONE));
+        world.getServer().runOnServer(server -> player(server).getEnderChestInventory().clear());
+
+        // K3: a box without the restock name is never used.
+        setPlayerInventory(world, Map.of(40, stack(Items.FIREWORK_ROCKET, 5), 12, shulkerWith("Fireworks", 3, stack(Items.FIREWORK_ROCKET, 64))));
+        context.waitFor(client -> client.player.getOffHandStack().getCount() == 5, 40);
+        context.waitTicks(20);
+        check("K3 a shulker box without the restock name is not used", clientCount(context, 40) == 5
+                && innerCount(world, false, 12, Items.FIREWORK_ROCKET) == 64, "offhand=" + clientCount(context, 40));
+
+        // K4: a stack at or above the threshold (16) is left alone.
+        setPlayerInventory(world, Map.of(3, stack(Items.COBBLESTONE, 20), 12, shulkerWith("Restock", 0, stack(Items.COBBLESTONE, 64))));
+        context.waitFor(client -> client.player.getInventory().getStack(3).getCount() == 20, 40);
+        context.waitTicks(20);
+        check("K4 a stack of 20 (threshold 16) is not restocked", clientCount(context, 3) == 20, "slot3=" + clientCount(context, 3));
+
+        // K5: threshold 1, so only using the last item up triggers it: place the last cobblestone.
+        context.runOnClient(client -> Configs.RESTOCK_THRESHOLD.setIntegerValue(1));
+        BlockPos target = chestA.add(-14, 0, 6);
+        refillCase(context, world, target, "K5 last item used up: slot refilled from a restock box",
+                Map.of(0, stack(Items.COBBLESTONE, 1), 12, shulkerWith("Restock", 0, stack(Items.COBBLESTONE, 64))), true,
+                c -> c.player.getInventory().getStack(0).isOf(Items.COBBLESTONE) && c.player.getInventory().getStack(0).getCount() == 64);
+        context.runOnClient(client -> Configs.RESTOCK_THRESHOLD.setIntegerValue(16));
+
+        // K6: Restock turned off.
+        context.runOnClient(client -> Configs.RESTOCK_ENABLED.setBooleanValue(false));
+        setPlayerInventory(world, Map.of(40, stack(Items.FIREWORK_ROCKET, 5), 12, shulkerWith("Restock Fireworks", 3, stack(Items.FIREWORK_ROCKET, 64))));
+        context.waitFor(client -> client.player.getOffHandStack().getCount() == 5, 40);
+        context.waitTicks(20);
+        check("K6 Restock off: nothing is restocked", clientCount(context, 40) == 5, "offhand=" + clientCount(context, 40));
+
+        context.runOnClient(client -> {
+            Configs.RESTOCK_ENABLED.setBooleanValue(true);
+            Configs.SHULKER_PICK_BLOCK.setBooleanValue(true);
+            Configs.USE_LINKED_CONTAINERS.setBooleanValue(true);
+            Configs.HOTBAR_REFILL.setBooleanValue(true);
+        });
+        setPlayerInventory(world, Map.of());
+        context.waitTicks(5);
     }
 
     private void setPlayerInventory(TestSingleplayerContext world, Map<Integer, ItemStack> items) {

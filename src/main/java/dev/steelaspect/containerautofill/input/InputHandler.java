@@ -66,6 +66,10 @@ public final class InputHandler implements IKeybindProvider, IHotkeyCallback {
             GuiBase.openGui(new GuiConfigs());
             return true;
         }
+        if (key == Configs.RESTOCK_ENABLED.getKeybind() && client.player != null) {
+            dev.steelaspect.containerautofill.restock.Restock.toggle(client);
+            return true;
+        }
         if (!Configs.ENABLE_MOD.getBooleanValue() || client.player == null) {
             return false;
         }

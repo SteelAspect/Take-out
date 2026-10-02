@@ -20,7 +20,7 @@ public class MenuScreenshotsGameTest implements FabricClientGameTest {
 
     @Override
     public void runTest(ClientGameTestContext context) {
-        for (String tab : new String[]{"GENERIC", "TAKEITOUT", "HIGHLIGHT", "HOTKEYS"}) {
+        for (String tab : new String[]{"GENERIC", "TAKEITOUT", "HIGHLIGHT", "RESTOCK", "HOTKEYS"}) {
             context.runOnClient(client -> {
                 setTab(tab);
                 client.setScreen(new GuiConfigs());

@@ -55,6 +55,7 @@ public final class StorageServerHandler {
         ServerPlayNetworking.registerGlobalReceiver(StoragePayloads.Deposit.ID, (p, ctx) -> deposit(ctx.player(), p));
         ServerPlayNetworking.registerGlobalReceiver(StoragePayloads.Query.ID, (p, ctx) -> query(ctx.player(), p));
         FillServerHandler.register();
+        RestockServerHandler.register();
     }
 
     static Inventory inventoryAt(ServerPlayerEntity player, Identifier dimension, BlockPos pos, boolean announceLock) {

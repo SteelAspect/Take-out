@@ -105,6 +105,27 @@ Link containers once, then take items from them, or put items into them, **from 
 - **Hotbar Refill** (on by default, TakeItOut tab, optional toggle key): when placing a block or using an item (pearls, snowballs...) uses up the last one in your hand, the slot is refilled with the same item. It looks in the rest of your inventory first, then shulker boxes you carry, then linked containers. Dropping an item doesn't trigger it, and it's off in creative and while Litematica's easy place is on (easy place picks its own items). Tools that break aren't refilled.
 - Links are saved per world/server in `config/containerautofill/storage/`. There's no limit on how many containers you link.
 
+### 6. Restock
+Keeps your hotbar and offhand stacks topped up from **restock shulker boxes**: shulker boxes whose name contains *restock* (rename one in an anvil, e.g. "Restock Fireworks"). They can be carried in your inventory or kept in your **ender chest**, which you don't need to open.
+
+- When a hotbar or offhand stack drops below *Restock Below* (default 16), it's filled back to a full stack. For items that stack to 16, like ender pearls, at most half a stack is used as the limit. Fireworks in the offhand for elytra flight never run out while the box has some.
+- If you use the last item of a stack, the slot is refilled too.
+- Restock has **its own config page** and its own on/off switch with an optional toggle key. It works even when the TakeItOut options, or the rest of the mod (*Enable Mod*), are off.
+- The server moves the items, so it needs singleplayer/LAN or `containerautofill-server` on a Fabric server. It doesn't work in creative.
+- A message tells you when an item you've been restocking runs out in your restock boxes (*Warn When Empty*).
+
+**Restock tab**
+
+| Option | Default | Description |
+|---|---|---|
+| Restock | on | On/off, optional toggle key. |
+| Restock Name | restock | A shulker box counts if its name contains this word (not case-sensitive). |
+| Restock Below | 16 | Top a stack back up to full once it drops below this. |
+| Restock Offhand | on | Also restock the offhand. |
+| From Inventory Shulkers | on | Use restock boxes in your inventory. |
+| From Ender Chest | on | Use restock boxes in your ender chest. |
+| Warn When Empty | on | Message when a restocked item runs out. |
+
 ## Hotkeys
 
 | Hotkey | Default | Notes |

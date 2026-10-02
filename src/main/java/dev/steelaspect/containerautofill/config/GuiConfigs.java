@@ -60,6 +60,7 @@ public class GuiConfigs extends GuiConfigsBase {
             case GENERIC -> Configs.GENERIC;
             case TAKEITOUT -> Configs.TAKEITOUT;
             case HIGHLIGHT -> Configs.HIGHLIGHT;
+            case RESTOCK -> Configs.RESTOCK;
             case HOTKEYS -> Configs.HOTKEYS;
         };
         return ConfigOptionWrapper.createFor(configs);
@@ -69,6 +70,7 @@ public class GuiConfigs extends GuiConfigsBase {
         GENERIC(Reference.MOD_ID + ".gui.button.config_gui.generic"),
         TAKEITOUT(Reference.MOD_ID + ".gui.button.config_gui.takeitout"),
         HIGHLIGHT(Reference.MOD_ID + ".gui.button.config_gui.highlight"),
+        RESTOCK(Reference.MOD_ID + ".gui.button.config_gui.restock"),
         HOTKEYS(Reference.MOD_ID + ".gui.button.config_gui.hotkeys");
 
         private final String translationKey;
