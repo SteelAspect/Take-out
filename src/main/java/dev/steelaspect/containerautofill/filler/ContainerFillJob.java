@@ -325,8 +325,7 @@ public final class ContainerFillJob {
     }
 
     /** Action bar summary plus a chat list of missing items. */
-    public void report(MinecraftClient client) {
-        if (client.player == null) return;
+    public FillResult report(MinecraftClient client) {
 
         int filledSlots = 0;
         int wrongSlots = 0;
@@ -357,6 +356,9 @@ public final class ContainerFillJob {
             }
         }
 
+        FillResult result = new FillResult(filledSlots, missingTotal, wrongSlots, this.actions, this.retrievedStacks, this.cancelReasonKey != null);
+        if (client.player == null) return result;
+
         if (this.cancelReasonKey != null) {
             client.player.sendMessage(Text.translatable(this.cancelReasonKey).formatted(Formatting.RED), false);
         }
@@ -381,5 +383,6 @@ public final class ContainerFillJob {
         }
         Configs.debug("Fill of {} finished: {} actions, {} shulker retrievals, {} filled, {} missing",
                 this.pos, this.actions, this.retrievedStacks, filledSlots, missingTotal);
+        return result;
     }
 }

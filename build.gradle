@@ -25,8 +25,51 @@ dependencies {
     modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
     modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
 
-    modImplementation "maven.modrinth:litematica:${project.litematica_modrinth_id}"
+    // -PwithoutLitematica keeps Litematica off the runtime classpath, to check Fabric's
+    // missing-dependency error (TESTING.md D2). Normal builds always use modImplementation.
+    if (project.hasProperty('withoutLitematica')) {
+        modCompileOnly "maven.modrinth:litematica:${project.litematica_modrinth_id}"
+    } else {
+        modImplementation "maven.modrinth:litematica:${project.litematica_modrinth_id}"
+    }
     modImplementation "maven.modrinth:malilib:${project.malilib_modrinth_id}"
+}
+
+// MaLiLib ships conditional-mixin as a jar-in-jar. Loom doesn't unpack nested jars of Maven mods for
+// dev runs, so MaLiLib's own copy is extracted onto the local runtime classpath (runClient / tests only;
+// never part of this mod's jar or metadata).
+configurations {
+    malilibArtifact { transitive = false }
+}
+dependencies {
+    malilibArtifact "maven.modrinth:malilib:${project.malilib_modrinth_id}"
+}
+def malilibNestedJar = layout.buildDirectory.file('malilib-nested/conditional-mixin-fabric.jar').get().asFile
+if (!malilibNestedJar.exists()) {
+    new java.util.zip.ZipFile(configurations.malilibArtifact.singleFile).withCloseable { zip ->
+        def entry = zip.entries().find { it.name.startsWith('META-INF/jars/conditional-mixin') }
+        if (entry != null) {
+            malilibNestedJar.parentFile.mkdirs()
+            malilibNestedJar.bytes = zip.getInputStream(entry).bytes
+        }
+    }
+}
+dependencies {
+    if (malilibNestedJar.exists()) {
+        modLocalRuntime files(malilibNestedJar)
+    }
+}
+
+// In-game client tests (src/gametest), run with ./gradlew runClientGameTest. Not part of the mod jar.
+fabricApi {
+    configureTests {
+        createSourceSet = true
+        modId = 'containerautofill-test'
+        enableGameTests = false
+        enableClientGameTests = true
+        eula = true
+        clearRunDirectory = true
+    }
 }
 
 processResources {

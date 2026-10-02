@@ -35,12 +35,24 @@ public final class AutoFillController {
     private static ContainerFillJob job;
     private static BlockPos pendingOpenPos;
     private static int pendingOpenTicks;
+    private static FillResult lastResult;
+    private static String lastMessageKey;
 
     private AutoFillController() {
     }
 
     public static boolean isRunning() {
         return job != null;
+    }
+
+    /** Result of the most recent fill, or null if none finished yet. */
+    public static FillResult getLastResult() {
+        return lastResult;
+    }
+
+    /** Translation key of the most recent action-bar message from the controller. */
+    public static String getLastMessageKey() {
+        return lastMessageKey;
     }
 
     public static void fillOpenContainer(MinecraftClient client) {
@@ -108,7 +120,7 @@ public final class AutoFillController {
             if (job.isFinished()) {
                 ContainerFillJob done = job;
                 job = null;
-                done.report(client);
+                lastResult = done.report(client);
                 if (done.closeWhenDone() && !done.wasCancelled() && client.player != null
                         && client.player.currentScreenHandler == done.handler()) {
                     client.player.closeHandledScreen();
@@ -172,6 +184,9 @@ public final class AutoFillController {
     }
 
     private static void actionBar(MinecraftClient client, Text text) {
+        if (text.getContent() instanceof net.minecraft.text.TranslatableTextContent translatable) {
+            lastMessageKey = translatable.getKey();
+        }
         if (client.player != null) {
             client.player.sendMessage(text.copy().formatted(Formatting.YELLOW), true);
         }
