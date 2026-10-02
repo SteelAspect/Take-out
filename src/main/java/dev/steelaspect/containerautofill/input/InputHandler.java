@@ -111,6 +111,10 @@ public final class InputHandler implements IKeybindProvider, IHotkeyCallback {
             AutoFillController.fillOpenContainer(client);
             return true;
         }
+        if (key == Configs.AREA_FILL.getKeybind()) {
+            AutoFillController.fillArea(client);
+            return true;
+        }
         if (key == Configs.FILL_LOOKED_AT_CONTAINER.getKeybind()) {
             AutoFillController.fillLookedAtContainer(client);
             return true;

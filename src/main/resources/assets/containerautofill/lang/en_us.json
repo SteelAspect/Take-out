@@ -32,7 +32,7 @@
   "containerautofill.config.comment.debugLogging": "Write detailed fill and retrieval steps to the game log.",
   "containerautofill.config.name.highlightContainers": "Highlight Containers",
   "containerautofill.config.prettyName.highlightContainers": "Highlight Containers",
-  "containerautofill.config.comment.highlightContainers": "Colour every placed schematic container near you by how it compares with the schematic:\ngreen = correct, blue = empty, yellow = partly filled, red = wrong items, grey = not checked yet.\nOn servers, a container's status is known after you open it once (or live with Servux + Litematica entity data sync).",
+  "containerautofill.config.comment.highlightContainers": "Colour every placed schematic container near you by how it compares with the schematic:\ngreen = correct, blue = empty, yellow = partly filled, red = wrong items, grey = not known.\nContents are read from the server (singleplayer/LAN, containerautofill-server); otherwise known after opening\na container once, or live with Servux + Litematica entity data sync.",
   "containerautofill.config.name.highlightRange": "Highlight Range",
   "containerautofill.config.prettyName.highlightRange": "Highlight Range",
   "containerautofill.config.comment.highlightRange": "Only containers within this many blocks are checked and highlighted.",
@@ -176,5 +176,17 @@
   "containerautofill.config.prettyName.instantFill": "Instant Fill",
   "containerautofill.config.comment.instantFill": "'Fill Looked At Container' fills the whole container at once on the server, without opening it\n(from your inventory, shulker boxes in it and linked containers). Needs singleplayer/LAN or containerautofill-server;\notherwise the container is opened and filled with clicks.",
   "containerautofill.message.instant_fill_timeout": "The server didn't answer the fill request",
-  "containerautofill.message.instant_fill_unavailable": "Part of the container couldn't be filled (not loaded, or locked)"
+  "containerautofill.message.instant_fill_unavailable": "Part of the container couldn't be filled (not loaded, or locked)",
+  "containerautofill.config.name.areaFillRange": "Area Fill Range",
+  "containerautofill.config.prettyName.areaFillRange": "Area Fill Range",
+  "containerautofill.config.comment.areaFillRange": "Blocks around you that the Area Fill key fills.",
+  "containerautofill.config.name.areaFill": "Area Fill",
+  "containerautofill.config.prettyName.areaFill": "Area Fill",
+  "containerautofill.config.comment.areaFill": "Instantly fills every placed schematic container within Area Fill Range that isn't already correct,\nnearest first, without opening anything. Needs singleplayer/LAN or containerautofill-server.",
+  "containerautofill.message.area_summary": "Filled %s slots in %s containers, %s items missing",
+  "containerautofill.message.area_fill_unsupported": "Area fill needs singleplayer/LAN or containerautofill-server on the server",
+  "containerautofill.message.area_fill_nothing": "No schematic containers to fill nearby",
+  "containerautofill.config.name.creativeFill": "Creative Fill",
+  "containerautofill.config.prettyName.creativeFill": "Creative Fill",
+  "containerautofill.config.comment.creativeFill": "In creative mode, fill containers completely with exactly what the schematic expects,\nwhether or not you have the items anywhere."
 }

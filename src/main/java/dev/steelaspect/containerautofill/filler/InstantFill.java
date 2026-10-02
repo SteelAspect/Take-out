@@ -40,15 +40,18 @@ public final class InstantFill {
 
     private static final class Pending {
         final int requestId;
+        final int containers;
         int repliesLeft;
         int filled;
         int wrong;
         boolean unavailable;
         long deadline;
         final Map<ItemMatcher.StackKey, Integer> missing = new LinkedHashMap<>();
+        final List<BlockPos> targets = new ArrayList<>();
 
-        Pending(int requestId, int replies, long deadline) {
+        Pending(int requestId, int containers, int replies, long deadline) {
             this.requestId = requestId;
+            this.containers = containers;
             this.repliesLeft = replies;
             this.deadline = deadline;
         }
@@ -87,26 +90,45 @@ public final class InstantFill {
 
     /** Sends the fill request(s) for the container at {@code pos}. The caller already checked the schematic. */
     public static void start(MinecraftClient client, BlockPos pos, SchematicContainerReader.Halves halves) {
+        startMany(client, List.of(halves));
+    }
+
+    /**
+     * Fills several containers in one go (area fill). The server handles the requests in order, so list the
+     * nearest container first: it gets items first when there aren't enough for all.
+     */
+    public static void startMany(MinecraftClient client, List<SchematicContainerReader.Halves> containers) {
         Identifier dimension = client.world.getRegistryKey().getValue();
         int requestId = ++nextRequestId;
-        pending = new Pending(requestId, halves.parts().size(), ticks + TIMEOUT_TICKS);
-
         Set<BlockPos> targets = new HashSet<>();
-        for (SchematicContainerReader.Part part : halves.parts()) targets.add(part.pos());
-        List<ItemStack> wanted = new ArrayList<>();
-        for (SchematicContainerReader.Part part : halves.parts()) wanted.addAll(part.single().items().values());
-        List<FillPayloads.Source> sources = Configs.USE_LINKED_CONTAINERS.getBooleanValue()
-                ? pickSources(client, dimension, targets, wanted) : List.of();
-
-        for (SchematicContainerReader.Part part : halves.parts()) {
-            List<StoragePayloads.SlotStack> expected = new ArrayList<>();
-            part.single().items().forEach((slot, stack) -> expected.add(new StoragePayloads.SlotStack(slot, stack)));
-            boolean crafter = part.single().state().getBlock() instanceof CrafterBlock;
-            ClientPlayNetworking.send(new FillPayloads.Fill(requestId, dimension, part.pos(), expected,
-                    new ArrayList<>(part.single().disabledSlots()), crafter,
-                    Configs.CLEAR_WRONG_ITEMS.getBooleanValue(), Configs.USE_TAKEITOUT_SOURCES.getBooleanValue(), sources));
+        int parts = 0;
+        for (SchematicContainerReader.Halves halves : containers) {
+            for (SchematicContainerReader.Part part : halves.parts()) {
+                targets.add(part.pos());
+                parts++;
+            }
         }
-        Configs.debug("Instant fill #{} of {} ({} part(s), {} linked sources)", requestId, pos, halves.parts().size(), sources.size());
+        pending = new Pending(requestId, containers.size(), parts, ticks + TIMEOUT_TICKS + parts);
+        pending.targets.addAll(targets);
+
+        for (SchematicContainerReader.Halves halves : containers) {
+            for (SchematicContainerReader.Part part : halves.parts()) {
+                send(client, requestId, dimension, part, targets);
+            }
+        }
+        Configs.debug("Instant fill #{}: {} container(s), {} part(s)", requestId, containers.size(), parts);
+    }
+
+    private static void send(MinecraftClient client, int requestId, Identifier dimension, SchematicContainerReader.Part part, Set<BlockPos> targets) {
+        List<FillPayloads.Source> sources = Configs.USE_LINKED_CONTAINERS.getBooleanValue()
+                ? pickSources(client, dimension, targets, List.copyOf(part.single().items().values())) : List.of();
+        List<StoragePayloads.SlotStack> expected = new ArrayList<>();
+        part.single().items().forEach((slot, stack) -> expected.add(new StoragePayloads.SlotStack(slot, stack)));
+        boolean crafter = part.single().state().getBlock() instanceof CrafterBlock;
+        ClientPlayNetworking.send(new FillPayloads.Fill(requestId, dimension, part.pos(), expected,
+                new ArrayList<>(part.single().disabledSlots()), crafter,
+                Configs.CLEAR_WRONG_ITEMS.getBooleanValue(), Configs.USE_TAKEITOUT_SOURCES.getBooleanValue(),
+                Configs.CREATIVE_FILL.getBooleanValue(), sources));
     }
 
     /**
@@ -148,6 +170,11 @@ public final class InstantFill {
         pending = null;
         report(client, p);
         StorageActions.refreshAll();
+        // Re-read the filled containers right away so the highlight shows the new state.
+        if (client.world != null) {
+            Identifier dimension = client.world.getRegistryKey().getValue();
+            for (BlockPos target : p.targets) StorageContents.requestOne(dimension, target);
+        }
     }
 
     private static void report(MinecraftClient client, Pending p) {
@@ -157,7 +184,11 @@ public final class InstantFill {
         if (p.unavailable) {
             client.player.sendMessage(Text.translatable("containerautofill.message.instant_fill_unavailable").formatted(Formatting.RED), false);
         }
-        client.player.sendMessage(Text.translatable("containerautofill.message.summary", p.filled, missingTotal), true);
+        if (p.containers > 1) {
+            client.player.sendMessage(Text.translatable("containerautofill.message.area_summary", p.filled, p.containers, missingTotal), true);
+        } else {
+            client.player.sendMessage(Text.translatable("containerautofill.message.summary", p.filled, missingTotal), true);
+        }
         if (!p.missing.isEmpty()) {
             client.player.sendMessage(Text.translatable("containerautofill.message.missing_header", missingTotal).formatted(Formatting.GOLD), false);
             for (Map.Entry<ItemMatcher.StackKey, Integer> e : p.missing.entrySet()) {

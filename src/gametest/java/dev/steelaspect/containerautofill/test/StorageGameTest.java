@@ -57,7 +57,7 @@ public class StorageGameTest implements FabricClientGameTest {
 
     private final List<String> failures = new ArrayList<>();
     private int passes;
-    private BlockPos chestA, chestB, dumpChest, farChest, goldBlock, fillLeft, fillRight, fillHopper;
+    private BlockPos chestA, chestB, dumpChest, farChest, goldBlock, fillLeft, fillRight, fillHopper, area1, area2, areaFar, area3;
     private LitematicaSchematic schematic;
     private Identifier overworld;
 
@@ -82,6 +82,8 @@ public class StorageGameTest implements FabricClientGameTest {
             testPickBlockFromStorage(context, world);
             testDump(context, world);
             testInstantFill(context, world);
+            testAreaFillAndServerStatus(context, world);
+            testCreativeFill(context, world);
             testLookAtAndGroups(context);
         }
 
@@ -125,6 +127,10 @@ public class StorageGameTest implements FabricClientGameTest {
         fillLeft = base.add(0, 0, 9);
         fillRight = base.add(1, 0, 9);
         fillHopper = base.add(3, 0, 9);
+        area1 = base.add(5, 0, 9);
+        area2 = base.add(7, 0, 9);
+        areaFar = base.add(20, 0, 9);
+        area3 = base.add(13, 0, 9);
         world.getServer().runCommand(String.format(Locale.ROOT, "forceload add %d %d", farChest.getX(), farChest.getZ()));
         world.getServer().runOnServer(server -> {
             ServerWorld w = server.getOverworld();
@@ -147,11 +153,18 @@ public class StorageGameTest implements FabricClientGameTest {
             fill(w, fillRight, Map.of(0, stack(Items.STONE, 64), 1, stack(Items.IRON_INGOT, 30)));
             fill(w, fillLeft, Map.of(0, stack(Items.EMERALD, 5), 3, stack(Items.GOLD_INGOT, 4), 7, fillGem));
             fill(w, fillHopper, Map.of(0, stack(Items.GLASS, 3), 2, stack(Items.TNT, 2)));
+            for (BlockPos p : List.of(area1, area2, areaFar, area3)) w.setBlockState(p, Blocks.CHEST.getDefaultState());
+            ItemStack namedGem = stack(Items.DIAMOND, 1);
+            namedGem.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Gem"));
+            fill(w, area3, Map.of(0, stack(Items.BRICKS, 20), 13, namedGem));
+            fill(w, area1, Map.of(0, stack(Items.OAK_LOG, 10)));
+            fill(w, area2, Map.of(4, stack(Items.BRICKS, 7)));
+            fill(w, areaFar, Map.of(0, stack(Items.OAK_LOG, 1)));
             AreaSelection area = new AreaSelection();
-            area.addSubRegionBox(new Box(fillLeft, fillHopper, "fill"), false);
+            area.addSubRegionBox(new Box(fillLeft, areaFar, "fill"), false);
             area.setExplicitOrigin(fillLeft);
             schematic = LitematicaSchematic.createFromWorld(w, area, new LitematicaSchematic.SchematicSaveInfo(false, true), "steelaspect", msg -> {});
-            for (BlockPos p : List.of(fillLeft, fillRight, fillHopper)) ((Inventory) w.getBlockEntity(p)).clear();
+            for (BlockPos p : List.of(fillLeft, fillRight, fillHopper, area1, area2, areaFar, area3)) ((Inventory) w.getBlockEntity(p)).clear();
             fill(w, fillHopper, Map.of(0, stack(Items.DIRT, 1)));
         });
         context.runOnClient(client -> DataManager.getSchematicPlacementManager()
@@ -403,6 +416,99 @@ public class StorageGameTest implements FabricClientGameTest {
                 matches(contents(world, fillHopper), Map.of(0, stack(Items.GLASS, 3))) && serverCount(world, s -> s.isOf(Items.DIRT)) == 1,
                 "hopper=" + contents(world, fillHopper));
         context.runOnClient(client -> Configs.CLEAR_WRONG_ITEMS.setBooleanValue(false));
+    }
+
+    private void testAreaFillAndServerStatus(ClientGameTestContext context, TestSingleplayerContext world) {
+        world.getServer().runOnServer(server -> {
+            PlayerInventory inv = player(server).getInventory();
+            inv.clear();
+            inv.setStack(9, stack(Items.OAK_LOG, 64));
+            inv.setStack(10, stack(Items.BRICKS, 64));
+        });
+        // Stand next to area1/area2; areaFar is 14 blocks away, the double chest is just out of range.
+        world.getServer().runCommand(String.format(Locale.ROOT, "tp @p %.1f %d %.1f 180 30",
+                area1.getX() + 1.5, area1.getY(), area1.getZ() + 2.5));
+        context.runOnClient(client -> Configs.AREA_FILL_RANGE.setIntegerValue(5));
+
+        var statuses = waitForStatus(context, area1, s -> s != null && s != dev.steelaspect.containerautofill.highlight.ContainerStatus.UNKNOWN);
+        check("Q1 status known without opening the container (from the server): EMPTY",
+                statuses.get(area1) == dev.steelaspect.containerautofill.highlight.ContainerStatus.EMPTY, "area1=" + statuses.get(area1));
+        statuses = waitForStatus(context, fillHopper, s -> s == dev.steelaspect.containerautofill.highlight.ContainerStatus.PARTIAL);
+        check("Q2 hopper (glass in, TNT missing) reads PARTIAL from the server without opening it",
+                statuses.get(fillHopper) == dev.steelaspect.containerautofill.highlight.ContainerStatus.PARTIAL, "hopper=" + statuses.get(fillHopper));
+
+        var before = dev.steelaspect.containerautofill.filler.AutoFillController.getLastResult();
+        boolean[] screenOpened = {false};
+        context.getInput().holdKey(GLFW.GLFW_KEY_LEFT_SHIFT);
+        context.getInput().pressKey(GLFW.GLFW_KEY_V);
+        context.getInput().releaseKey(GLFW.GLFW_KEY_LEFT_SHIFT);
+        try {
+            context.waitFor(client -> {
+                if (client.currentScreen != null) screenOpened[0] = true;
+                return dev.steelaspect.containerautofill.filler.AutoFillController.getLastResult() != before;
+            }, 100);
+        } catch (Throwable t) {
+            check("A1 area fill answered", false, "no result");
+            return;
+        }
+        check("A1 area fill (Shift+V) filled both nearby containers without opening them",
+                !screenOpened[0] && matches(contents(world, area1), Map.of(0, stack(Items.OAK_LOG, 10)))
+                        && matches(contents(world, area2), Map.of(4, stack(Items.BRICKS, 7))),
+                "area1=" + contents(world, area1) + " area2=" + contents(world, area2) + " screen=" + screenOpened[0]);
+        check("A2 container outside Area Fill Range left alone", contents(world, areaFar).isEmpty(), "far=" + contents(world, areaFar));
+        check("A3 correct containers skipped, out-of-range double chest untouched",
+                matches(contents(world, fillHopper), Map.of(0, stack(Items.GLASS, 3))) && contents(world, fillLeft).size() == 3,
+                "hopper=" + contents(world, fillHopper));
+        var after = waitForStatus(context, area1, s -> s == dev.steelaspect.containerautofill.highlight.ContainerStatus.CORRECT);
+        check("Q3 highlight turns CORRECT after area fill", after.get(area1) == dev.steelaspect.containerautofill.highlight.ContainerStatus.CORRECT,
+                "area1=" + after.get(area1));
+    }
+
+    private void testCreativeFill(ClientGameTestContext context, TestSingleplayerContext world) {
+        world.getServer().runCommand("gamemode creative @a");
+        world.getServer().runOnServer(server -> player(server).getInventory().clear());
+        context.runOnClient(client -> {
+            Configs.CREATIVE_FILL.setBooleanValue(true);
+            Configs.INSTANT_FILL.setBooleanValue(true);
+        });
+        context.waitTicks(10);
+
+        lookAt(context, world, areaFar);
+        var before = dev.steelaspect.containerautofill.filler.AutoFillController.getLastResult();
+        context.getInput().pressKey(GLFW.GLFW_KEY_V);
+        try {
+            context.waitFor(client -> dev.steelaspect.containerautofill.filler.AutoFillController.getLastResult() != before, 100);
+        } catch (Throwable ignored) {
+        }
+        check("C1 creative instant fill with an empty inventory and nothing linked fills the container",
+                matches(contents(world, areaFar), Map.of(0, stack(Items.OAK_LOG, 1))), "far=" + contents(world, areaFar));
+
+        // Click-based fallback (Instant Fill off): items are made with creative inventory actions, then clicked in.
+        context.runOnClient(client -> Configs.INSTANT_FILL.setBooleanValue(false));
+        lookAt(context, world, area3);
+        var beforeClicks = dev.steelaspect.containerautofill.filler.AutoFillController.getLastResult();
+        context.getInput().pressKey(GLFW.GLFW_KEY_V);
+        try {
+            context.waitFor(client -> dev.steelaspect.containerautofill.filler.AutoFillController.getLastResult() != beforeClicks
+                    && client.currentScreen == null, 400);
+        } catch (Throwable ignored) {
+        }
+        ItemStack gem = stack(Items.DIAMOND, 1);
+        gem.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Gem"));
+        check("C2 creative click fill (Instant Fill off) fills exactly, including a named item",
+                matches(contents(world, area3), Map.of(0, stack(Items.BRICKS, 20), 13, gem)), "area3=" + contents(world, area3));
+        context.runOnClient(client -> Configs.INSTANT_FILL.setBooleanValue(true));
+        world.getServer().runCommand("gamemode survival @a");
+        context.waitTicks(5);
+    }
+
+    private Map<BlockPos, dev.steelaspect.containerautofill.highlight.ContainerStatus> waitForStatus(ClientGameTestContext context, BlockPos pos,
+            Predicate<dev.steelaspect.containerautofill.highlight.ContainerStatus> ready) {
+        try {
+            context.waitFor(client -> ready.test(dev.steelaspect.containerautofill.highlight.ContainerHighlighter.statuses().get(pos)), 200);
+        } catch (Throwable ignored) {
+        }
+        return dev.steelaspect.containerautofill.highlight.ContainerHighlighter.statuses();
     }
 
     private void testLookAtAndGroups(ClientGameTestContext context) {

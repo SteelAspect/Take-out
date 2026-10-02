@@ -6,6 +6,9 @@
 package dev.steelaspect.containerautofill.filler;
 
 import dev.steelaspect.containerautofill.config.Configs;
+import dev.steelaspect.containerautofill.highlight.ContainerHighlighter;
+import dev.steelaspect.containerautofill.highlight.ContainerStatus;
+import dev.steelaspect.containerautofill.highlight.SchematicContainerIndex;
 import net.minecraft.block.Block;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.client.MinecraftClient;
@@ -20,6 +23,13 @@ import net.minecraft.util.Hand;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.hit.HitResult;
 import net.minecraft.util.math.BlockPos;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * Entry points for both fill modes:
@@ -118,6 +128,55 @@ public final class AutoFillController {
         client.interactionManager.interactBlock(client.player, Hand.MAIN_HAND, hit);
         pendingOpenPos = pos;
         pendingOpenTicks = 0;
+    }
+
+    /**
+     * Area key: instant-fills every placed schematic container within Area Fill Range that isn't already
+     * correct, nearest first. Needs server support (singleplayer/LAN or containerautofill-server).
+     */
+    public static void fillArea(MinecraftClient client) {
+        if (client.player == null || client.world == null) return;
+        if (!InstantFill.isSupported()) {
+            actionBar(client, Text.translatable("containerautofill.message.area_fill_unsupported"));
+            return;
+        }
+        if (job != null || pendingOpenPos != null || InstantFill.isRunning()) {
+            actionBar(client, Text.translatable("containerautofill.message.already_running"));
+            return;
+        }
+
+        SchematicContainerIndex.refresh(client.world.getRegistryManager());
+        double range = Configs.AREA_FILL_RANGE.getIntegerValue();
+        BlockPos center = client.player.getBlockPos();
+        List<BlockPos> candidates = new ArrayList<>();
+        for (BlockPos pos : SchematicContainerIndex.entries().keySet()) {
+            if (pos.getSquaredDistance(center) <= range * range) candidates.add(pos);
+        }
+        candidates.sort(Comparator.comparingDouble(pos -> pos.getSquaredDistance(center)));
+
+        Map<BlockPos, ContainerStatus> statuses = ContainerHighlighter.statuses();
+        Set<BlockPos> seen = new HashSet<>();
+        List<SchematicContainerReader.Halves> toFill = new ArrayList<>();
+        for (BlockPos pos : candidates) {
+            if (seen.contains(pos) || !client.world.isChunkLoaded(pos.getX() >> 4, pos.getZ() >> 4)) continue;
+            SchematicContainerReader.Halves halves = SchematicContainerReader.readHalves(client.world, pos, client.world.getRegistryManager());
+            if (halves.status() != SchematicContainerReader.Status.OK) {
+                seen.add(pos);
+                continue;
+            }
+            boolean allCorrect = true;
+            for (SchematicContainerReader.Part part : halves.parts()) {
+                seen.add(part.pos());
+                if (statuses.get(part.pos()) != ContainerStatus.CORRECT) allCorrect = false;
+            }
+            if (!allCorrect) toFill.add(halves);
+        }
+
+        if (toFill.isEmpty()) {
+            actionBar(client, Text.translatable("containerautofill.message.area_fill_nothing"));
+            return;
+        }
+        InstantFill.startMany(client, toFill);
     }
 
     public static void tick(MinecraftClient client) {

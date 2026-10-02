@@ -36,7 +36,7 @@ public final class FillPayloads {
      */
     public record Fill(int requestId, Identifier dimension, BlockPos pos, List<StoragePayloads.SlotStack> expected,
                        List<Integer> disabledSlots, boolean applyLocks, boolean clearWrong, boolean useShulkers,
-                       List<Source> sources) implements CustomPayload {
+                       boolean creativeFill, List<Source> sources) implements CustomPayload {
         public static final Id<Fill> ID = new Id<>(Identifier.of("containerautofill", "fill"));
         public static final PacketCodec<RegistryByteBuf, Fill> CODEC = PacketCodec.tuple(
                 PacketCodecs.VAR_INT, Fill::requestId,
@@ -47,6 +47,7 @@ public final class FillPayloads {
                 PacketCodecs.BOOLEAN, Fill::applyLocks,
                 PacketCodecs.BOOLEAN, Fill::clearWrong,
                 PacketCodecs.BOOLEAN, Fill::useShulkers,
+                PacketCodecs.BOOLEAN, Fill::creativeFill,
                 Source.CODEC.collect(PacketCodecs.toList(MAX_SOURCES)), Fill::sources,
                 Fill::new);
 

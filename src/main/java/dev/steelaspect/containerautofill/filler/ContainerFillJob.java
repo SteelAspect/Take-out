@@ -55,6 +55,8 @@ public final class ContainerFillJob {
     private final Set<ItemMatcher.StackKey> unavailable = new HashSet<>();
     private final Map<ItemMatcher.StackKey, Integer> retrievalFailures = new HashMap<>();
     private final Map<Integer, Integer> transfersPerSlot = new HashMap<>();
+    private final Map<ItemMatcher.StackKey, Integer> creativeRequests = new HashMap<>();
+    private int creativeWaitTicks;
 
     private Transfer transfer;
     private RetrievalWait retrievalWait;
@@ -124,6 +126,12 @@ public final class ContainerFillJob {
 
         if (this.retrievalWait != null) {
             if (ShulkerRetriever.isWaiting() || StorageRetriever.isWaiting()) return;
+            if (this.creativeWaitTicks > 0 && client.player != null
+                    && ShulkerRetriever.countInInventory(client.player.getInventory(), this.retrievalWait.matcher()) <= this.retrievalWait.countBefore()) {
+                this.creativeWaitTicks--;
+                return;
+            }
+            this.creativeWaitTicks = 0;
             finishRetrievalWait(client);
         }
 
@@ -217,6 +225,9 @@ public final class ContainerFillJob {
                 continue;
             }
 
+            if (requestFromCreative(client, want, key, need)) {
+                return true;
+            }
             if (requestFromLinkedStorage(client, want, key, need)) {
                 return true;
             }
@@ -304,6 +315,25 @@ public final class ContainerFillJob {
             }
         }
         return best;
+    }
+
+    /** Creative mode: put the item into an empty inventory slot with vanilla's creative action, then click it in. */
+    private boolean requestFromCreative(MinecraftClient client, ItemStack want, ItemMatcher.StackKey key, int need) {
+        if (client.player == null || !client.player.isInCreativeMode() || !Configs.CREATIVE_FILL.getBooleanValue()) return false;
+        if (this.creativeRequests.merge(key, 1, Integer::sum) > MAX_RETRIEVAL_FAILURES + 1) return false;
+        int empty = client.player.getInventory().getEmptySlot();
+        if (empty < 0 || empty >= dev.steelaspect.containerautofill.takeitout.ShulkerUtil.PLAYER_MAIN_SLOTS) {
+            this.inventoryFull = true;
+            return false;
+        }
+        Predicate<ItemStack> matcher = s -> ItemStack.areItemsAndComponentsEqual(s, want);
+        int before = ShulkerRetriever.countInInventory(client.player.getInventory(), matcher);
+        // Creative inventory packets address the player's own screen: hotbar is 36..44, storage 9..35.
+        int slotId = empty < 9 ? 36 + empty : empty;
+        client.interactionManager.clickCreativeStack(want.copyWithCount(Math.min(need, want.getMaxCount())), slotId);
+        this.retrievalWait = new RetrievalWait(key, matcher, before);
+        this.creativeWaitTicks = 20;
+        return true;
     }
 
     private boolean requestFromLinkedStorage(MinecraftClient client, ItemStack want, ItemMatcher.StackKey key, int need) {

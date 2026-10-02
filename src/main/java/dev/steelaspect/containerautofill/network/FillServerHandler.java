@@ -30,6 +30,7 @@ import java.util.Set;
  * Fills a container server-side in one go, without the player opening it. Items are only moved, never
  * created: from the player's inventory, shulker boxes in it, and the linked containers the client lists.
  * The same container access rules as linked storage apply (loaded chunk, vanilla lock items respected).
+ * Players the server sees in creative mode can ask for a creative fill: the expected items are created.
  */
 public final class FillServerHandler {
     private FillServerHandler() {
@@ -108,6 +109,7 @@ public final class FillServerHandler {
             }
         }
 
+        boolean creative = request.creativeFill() && player.isInCreativeMode();
         int filled = 0;
         for (Map.Entry<Integer, ItemStack> entry : expected.entrySet()) {
             int slot = entry.getKey();
@@ -124,7 +126,7 @@ public final class FillServerHandler {
             int before = have.getCount();
             int need = goal - before;
             if (need > 0 && insertable) {
-                ItemStack pulled = pull(player, want, need, request);
+                ItemStack pulled = creative ? want.copyWithCount(need) : pull(player, want, need, request);
                 if (!pulled.isEmpty()) {
                     if (have.isEmpty()) {
                         target.setStack(slot, pulled);

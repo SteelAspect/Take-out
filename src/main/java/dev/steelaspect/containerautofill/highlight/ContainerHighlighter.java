@@ -8,7 +8,10 @@ package dev.steelaspect.containerautofill.highlight;
 import dev.steelaspect.containerautofill.config.Configs;
 import dev.steelaspect.containerautofill.filler.ItemMatcher;
 import dev.steelaspect.containerautofill.filler.SchematicContainerReader;
+import dev.steelaspect.containerautofill.storage.StorageContents;
+import dev.steelaspect.containerautofill.storage.StorageStore;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.util.Identifier;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.math.BlockPos;
 
@@ -20,6 +23,7 @@ import java.util.Map;
 
 /**
  * Works out, twice a second, how each nearby placed schematic container compares with the schematic.
+ * Contents come from the server (no need to open anything) when it supports it.
  * Containers the schematic expects but that aren't placed (or are a different kind of block) are skipped.
  */
 public final class ContainerHighlighter {
@@ -67,7 +71,17 @@ public final class ContainerHighlighter {
             }
         }
 
-        if (client.isIntegratedServerRunning()) {
+        // Ask the server what is inside, so containers don't have to be opened to get a status. Works in
+        // singleplayer/LAN and on servers with containerautofill-server; otherwise use what we have.
+        Identifier dimension = client.world.getRegistryKey().getValue();
+        boolean serverQueries = StorageContents.isSupported();
+        if (serverQueries) {
+            if (!StorageContents.isRefreshing()) {
+                List<StorageStore.Entry> entries = new ArrayList<>();
+                for (BlockPos pos : near) entries.add(new StorageStore.Entry(dimension, pos));
+                StorageContents.request(entries);
+            }
+        } else if (client.isIntegratedServerRunning()) {
             RealContainerCache.refreshFromIntegratedServer(client, near);
         } else {
             RealContainerCache.refreshFromServux(client, near);
@@ -80,7 +94,12 @@ public final class ContainerHighlighter {
             if (client.world.getBlockState(pos).isAir() || !SchematicContainerReader.isCompatible(client.world, pos, expected.state())) {
                 continue;
             }
-            Map<Integer, ItemStack> actual = RealContainerCache.get(pos);
+            Map<Integer, ItemStack> actual = null;
+            if (serverQueries) {
+                StorageContents.Snapshot snapshot = StorageContents.get(dimension, pos);
+                if (snapshot != null && snapshot.available()) actual = snapshot.items();
+            }
+            if (actual == null) actual = RealContainerCache.get(pos);
             next.put(pos, actual == null ? ContainerStatus.UNKNOWN : compare(expected.items(), actual));
         }
         statuses = Collections.unmodifiableMap(next);

@@ -36,6 +36,8 @@ public class Configs implements IConfigHandler {
     public static final ConfigInteger CLICK_DELAY = new ConfigInteger("clickDelay", 1, 1, 40).apply(PREFIX);
     public static final ConfigBoolean CLEAR_WRONG_ITEMS = new ConfigBoolean("clearWrongItems", false).apply(PREFIX);
     public static final ConfigBoolean INSTANT_FILL = new ConfigBoolean("instantFill", true).apply(PREFIX);
+    public static final ConfigBoolean CREATIVE_FILL = new ConfigBoolean("creativeFill", true).apply(PREFIX);
+    public static final ConfigInteger AREA_FILL_RANGE = new ConfigInteger("areaFillRange", 16, 1, 64).apply(PREFIX);
     public static final ConfigBoolean USE_TAKEITOUT_SOURCES = new ConfigBoolean("useTakeItOutSources", true).apply(PREFIX);
     public static final ConfigBoolean MATCH_SHULKER_BOXES_BY_CONTENT = new ConfigBoolean("matchShulkerBoxesByContent", false).apply(PREFIX);
     public static final ConfigBoolean CLOSE_AFTER_LOOK_FILL = new ConfigBoolean("closeAfterLookFill", true).apply(PREFIX);
@@ -55,6 +57,8 @@ public class Configs implements IConfigHandler {
     public static final ImmutableList<IConfigBase> GENERIC = ImmutableList.of(
             ENABLE_MOD,
             INSTANT_FILL,
+            AREA_FILL_RANGE,
+            CREATIVE_FILL,
             CLICK_DELAY,
             CLEAR_WRONG_ITEMS,
             MATCH_SHULKER_BOXES_BY_CONTENT,
@@ -109,6 +113,8 @@ public class Configs implements IConfigHandler {
     public static final ConfigHotkey AUTO_FILL_OPEN_CONTAINER = new ConfigHotkey("autoFillOpenContainer", "", KeybindSettings.GUI).apply(PREFIX);
     /** Opens and fills the schematic container under the crosshair. */
     public static final ConfigHotkey FILL_LOOKED_AT_CONTAINER = new ConfigHotkey("fillLookedAtContainer", "V").apply(PREFIX);
+    /** Instant-fills every schematic container within Area Fill Range. */
+    public static final ConfigHotkey AREA_FILL = new ConfigHotkey("areaFill", "LEFT_SHIFT,V").apply(PREFIX);
     public static final ConfigHotkey OPEN_CONFIG_GUI = new ConfigHotkey("openConfigGui", "L,C").apply(PREFIX);
     public static final ConfigHotkey OPEN_STORAGE_MENU = new ConfigHotkey("openStorageMenu", "Y").apply(PREFIX);
     public static final ConfigHotkey LINK_LOOKED_AT = new ConfigHotkey("linkLookedAtContainer", "H").apply(PREFIX);
@@ -119,6 +125,7 @@ public class Configs implements IConfigHandler {
     public static final List<ConfigHotkey> HOTKEYS = ImmutableList.of(
             AUTO_FILL_OPEN_CONTAINER,
             FILL_LOOKED_AT_CONTAINER,
+            AREA_FILL,
             OPEN_CONFIG_GUI,
             OPEN_STORAGE_MENU,
             LINK_LOOKED_AT,
