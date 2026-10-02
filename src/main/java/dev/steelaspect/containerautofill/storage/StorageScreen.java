@@ -180,8 +180,8 @@ public class StorageScreen extends Screen {
         this.addDrawableChild(this.itemList);
     }
 
-    private void takeFromList(ItemStack kind, int total, boolean all) {
-        int amount = all ? total : Configs.SINGLE_ITEM_MODE.getBooleanValue() ? 1 : kind.getMaxCount();
+    /** Left click: a stack (shift: everything). Right click: one item. */
+    private void takeFromList(ItemStack kind, int total, int amount) {
         StorageActions.take(this.client, kind, Math.min(amount, total));
     }
 
@@ -255,7 +255,9 @@ public class StorageScreen extends Screen {
             StorageScreen.this.itemList.setSelected(this);
             StorageScreen.this.clearAndInitKeepList();
             if (click.button() == 0) {
-                takeFromList(this.stack, this.count, click.hasShift());
+                takeFromList(this.stack, this.count, click.hasShift() ? this.count : this.stack.getMaxCount());
+            } else if (click.button() == 1) {
+                takeFromList(this.stack, this.count, 1);
             }
             return true;
         }

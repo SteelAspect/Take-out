@@ -77,6 +77,20 @@ Look at a schematic container and press **V**. The mod opens the container, fill
 
 On a server without either, the mod notices that the server doesn't accept the channel. It tells you once, then only uses items you carry loose.
 
+### 5. Linked storage (TakeItOut-style storage menu)
+Link containers once, then take items from them, or put items into them, **from any distance, as long as their chunk is loaded**. The server moves the items, so this works in singleplayer/LAN and on Fabric servers with `containerautofill-server`. Containers locked with a vanilla lock item stay locked.
+
+- **Link:** look at a container and press `H` (press again to unlink). Double chests link both halves. **Box Select Corner:** press on two opposite corners to link every container in between.
+- **Storage menu** (`Y`):
+  - *All Items*: everything in your linked containers, with search and counts. Left-click takes a stack, right-click takes 1, Shift + left-click takes all of that item.
+  - *Containers*: link, unlink and delete, plus Delete All.
+  - *Groups*: named sets, one active at a time. Share copies a group to the clipboard and Import pastes one in.
+  - *Settings*, *Refresh*, *Look At* (marks the containers holding the selected item for 10 s) and *Sort* (name or count).
+- **Dump:** mark containers as dump targets (*Mark Dump Container*), then *Dump to Containers* moves your main inventory (not the hotbar) into them.
+- **Outlines:** linked containers are outlined in green and dump containers in orange. You can toggle this and change the colours.
+- **Pulling from storage:** auto-fill, pick block and Auto Take Out pull missing items from linked containers too. *Single-item Mode* (`B`) makes pick block take 1 item.
+- Links are saved per world/server in `config/containerautofill/storage/`, with up to 500 containers per group.
+
 ## Hotkeys
 
 | Hotkey | Default | Notes |
@@ -85,6 +99,10 @@ On a server without either, the mod notices that the server doesn't accept the c
 | Fill Looked At Container | `V` | In game, no screen open. |
 | Auto Take Out (toggle) | `R` | Same default as TakeItOut. |
 | Open Config GUI | `L` + `C` | The config is also listed in MaLiLib's config menu. |
+| Open Storage Menu | `Y` | Linked storage menu. |
+| Link Looked-at Container | `H` | Link or unlink. |
+| Single-item Mode (toggle) | `B` | |
+| Box Select Corner / Mark Dump Container / Dump to Containers / Linked Outlines | *(unbound)* | |
 
 None of these defaults clash with vanilla, Litematica or MaLiLib defaults.
 

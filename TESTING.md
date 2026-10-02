@@ -69,6 +69,13 @@
 | H7–H8 | Highlight coverage | Double chests, furnace, brewing stand, crafter, copper, recoloured shulker | All highlighted |
 | H9 | Highlight live update | Fill an empty chest | Turns green within a second |
 
+| S1–S5 | Linking | `H` on a chest; box select two corners; mark dump; link a chest 160 blocks away (force-loaded) | Linked, dump flag set, far contents read, saved to `config/containerautofill/storage/` |
+| S6 | Storage menu | Press `Y` | Menu opens (All Items / Containers / Groups) |
+| S7 | Remote take | Take 10 emeralds from the chest 160 blocks away | Player +10, chest −10 |
+| S8 | Pick block from storage | Middle-click a gold block you only have in a linked chest | Gold block in the main hand |
+| S9 | Dump | Dump key with cobblestone/dirt in main inventory, torches in hotbar | Main inventory moved into the dump chest, hotbar kept |
+| S10–S12 | Look At, groups | Look At iron; new group; switch back; share + import | Marked; group empty then restored; import copies all entries |
+
 ## D. Dependency / launch tests
 
 | # | Case | Steps | Expected |
@@ -88,4 +95,5 @@ Record each run here (date, version, environment, pass/fail per case).
 | 2026-10-02 | 1.0.0+1.21.11 | runClient -PwithoutLitematica | D2 pass: "requires version 0.26.16 or later of litematica, which is missing!" (no crash) |
 | 2026-10-02 | 1.0.0+1.21.11 | runClientGameTest, Xvfb | 53/53 automated checks pass: C1, C2, C4–C11, C13, C14, C16–C23, T1–T9, H1–H9. Crafter (T9) item placement intermittent (2 of 4 runs left one slot empty) – accepted known issue |
 | 2026-10-02 | 1.0.0+1.21.11 | :server:runServer | A8 pass: containerautofill_server loaded, channel registered, server started/stopped |
+| 2026-10-02 | 1.0.0+1.21.11 | runClientGameTest (main + storage + menus), Xvfb | 53/53 + 14/14 pass (crafter known issue logged) |
 | – | – | Not testable here | C12 (needs a separate Fabric server + client connection), D3 (needs the original mods' jars) |

@@ -52,16 +52,18 @@ public class StorageGameTest implements FabricClientGameTest {
 
     @Override
     public void runTest(ClientGameTestContext context) {
-        context.runOnClient(client -> {
-            Configs.BOX_SELECT_CORNER.setValueFromString("J");
-            Configs.MARK_DUMP_CONTAINER.setValueFromString("U");
-            Configs.DUMP_TO_CONTAINERS.setValueFromString("N");
-            Configs.CLICK_DELAY.setIntegerValue(1);
-            InputEventHandler.getKeybindManager().updateUsedKeys();
-        });
-
         try (TestSingleplayerContext world = context.worldBuilder().create()) {
             world.getClientWorld().waitForChunksRender();
+            // After joining: MaLiLib reloads its config files when a world loads.
+            context.runOnClient(client -> {
+                Configs.BOX_SELECT_CORNER.setValueFromString("J");
+                Configs.MARK_DUMP_CONTAINER.setValueFromString("U");
+                Configs.DUMP_TO_CONTAINERS.setValueFromString("N");
+                Configs.CLICK_DELAY.setIntegerValue(1);
+                Configs.SHULKER_PICK_BLOCK.setBooleanValue(true);
+                Configs.USE_LINKED_CONTAINERS.setBooleanValue(true);
+                InputEventHandler.getKeybindManager().updateUsedKeys();
+            });
             setup(context, world);
             testLinkingHotkeys(context, world);
             testMenuScreenshots(context, world);

@@ -142,7 +142,7 @@
   "containerautofill.storage.sort_count": "Sort: Count",
   "containerautofill.storage.search": "Search...",
   "containerautofill.storage.sources": "Sources: %s",
-  "containerautofill.storage.items_hint": "Click: take  Shift: all  Right: select",
+  "containerautofill.storage.items_hint": "Left: stack  Right: 1  Shift: all",
   "containerautofill.storage.world": "World: %s [%s] | Linked: %s/%s",
   "containerautofill.storage.delete_all": "Delete All",
   "containerautofill.storage.delete_all_confirm": "Confirm?",
