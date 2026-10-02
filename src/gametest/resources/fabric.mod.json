@@ -11,6 +11,7 @@
   "entrypoints": {
     "fabric-client-gametest": [
       "dev.steelaspect.containerautofill.test.ContainerAutoFillClientGameTest",
+      "dev.steelaspect.containerautofill.test.StorageGameTest",
       "dev.steelaspect.containerautofill.test.MenuScreenshotsGameTest"
     ]
   },

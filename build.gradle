@@ -72,6 +72,14 @@ fabricApi {
     }
 }
 
+// The storage query handler answers from inside its packet handler, which the client game test network
+// synchronizer doesn't support; Fabric's documented switch for that case (test runs only).
+loom {
+    runs.matching { it.name == 'clientGameTest' }.configureEach {
+        vmArg '-Dfabric.client.gametest.disableNetworkSynchronizer=true'
+    }
+}
+
 processResources {
     def props = [
             version          : project.version,
