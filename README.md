@@ -15,10 +15,10 @@ It also adds a new **auto-fill hotkey** and a **container highlight** that shows
 |---|---|
 | Fabric Loader | ≥ 0.19.5 |
 | Fabric API | any 1.21.11 build (built against 0.141.6+1.21.11) |
-| Litematica | ≥ 0.26.16 for 1.21.11 |
-| MaLiLib | ≥ 0.27.20 for 1.21.11 |
+| Litematica | ≥ 0.26.16 for 1.21.11 (client only) |
+| MaLiLib | ≥ 0.27.20 for 1.21.11 (client only) |
 
-For pulling items out of shulker boxes on a **Fabric dedicated server**, also put `containerautofill-server-<version>.jar` (from `build/libs`) in the server's `mods` folder. It needs only Fabric API. It isn't needed in singleplayer or LAN. Keep the client and server jars on the same version: with an older server jar, linked storage reports that the server doesn't support it.
+**One jar for client and server.** On a **Fabric dedicated server**, put the same `containerautofill-<version>.jar` in the server's `mods` folder (with Fabric API) to enable the server-side features: shulker retrieval, linked storage, instant/area fill, server-read highlight status and Restock. The server doesn't need Litematica or MaLiLib; the client does. It isn't needed on the server in singleplayer or LAN. Keep the client and server on the same version.
 
 TakeItOut and Litematica-Container-Filler are **not** needed. They are declared as `breaks` because they register the same network channel and the same default keys. If either is installed, Fabric stops at launch with a clear message.
 
@@ -56,7 +56,7 @@ Placed schematic containers within *Highlight Range* get a see-through coloured 
 | grey | contents not known yet |
 
 - In singleplayer and LAN the highlight is always live.
-- **No need to open containers:** the colours come from the server reading each container's contents, in singleplayer/LAN and on Fabric servers with `containerautofill-server`. On other servers, a container's colour is known once you've opened it (it's remembered afterwards), or live with **Servux** and Litematica's *entityDataSync* on.
+- **No need to open containers:** the colours come from the server reading each container's contents, in singleplayer/LAN and on Fabric servers that also run this mod. On other servers, a container's colour is known once you've opened it (it's remembered afterwards), or live with **Servux** and Litematica's *entityDataSync* on.
 - A container whose block differs from the schematic (e.g. a barrel instead of a chest) isn't highlighted.
 - Toggle the highlight with *Highlight Containers*, which has an optional hotkey. Colours, range, see-through mode and hiding green/grey boxes are all configurable.
 
@@ -73,7 +73,7 @@ Double chests, crafter slot locks and *Clear Wrong Items* are handled the same w
 
 **Creative mode:** with *Creative Fill* on (the default), every fill gives containers exactly what the schematic expects, whether or not you have the items anywhere. Instant and area fill do this on the server, which checks that you're really in creative. The click-based fallback uses vanilla's creative inventory to make each item, then clicks it in.
 
-Instant Fill and Area Fill need singleplayer/LAN, or a Fabric server with `containerautofill-server`. Without either (or with Instant Fill turned off), `V` falls back to the original behaviour from Litematica-Container-Filler: it opens the container, fills it with clicks and closes it again (*Close After Look Fill*).
+Instant Fill and Area Fill need singleplayer/LAN, or a Fabric server that also runs this mod. Without either (or with Instant Fill turned off), `V` falls back to the original behaviour from Litematica-Container-Filler: it opens the container, fills it with clicks and closes it again (*Close After Look Fill*).
 
 ### 4. TakeItOut behaviour (shulker retrieval)
 - **Pick block from shulkers.** If you pick a block with vanilla middle-click, Litematica's schematic pick-block or easy place, and you don't carry it loose, the mod pulls it from a shulker box in your inventory into your hand.
@@ -84,13 +84,13 @@ Instant Fill and Area Fill need singleplayer/LAN, or a Fabric server with `conta
 
 **How retrieval works (same as TakeItOut).** The client sends a `takeitout:getstack(slot, shulker)` request, and the **server** moves the item out of the shulker box. This works:
 - in **singleplayer** and when **hosting a LAN world**, because this mod handles the request on the integrated server;
-- on **Fabric servers** with `containerautofill-server` installed;
+- on **Fabric servers** with this mod installed;
 - on servers running TakeItOut's own server mod, since the channel and data format are the same.
 
 On a server without either, the mod notices that the server doesn't accept the channel. It tells you once, then only uses items you carry loose.
 
 ### 5. Linked storage (TakeItOut-style storage menu)
-Link containers once, then take items from them, or put items into them, **from any distance, as long as their chunk is loaded**. The server moves the items, so this works in singleplayer/LAN and on Fabric servers with `containerautofill-server`. Containers locked with a vanilla lock item stay locked.
+Link containers once, then take items from them, or put items into them, **from any distance, as long as their chunk is loaded**. The server moves the items, so this works in singleplayer/LAN and on Fabric servers that also run this mod. Containers locked with a vanilla lock item stay locked.
 
 - **Link:** look at a container and press `H` (press again to unlink). Double chests link both halves. **Box Select Corner:** press on two opposite corners to link every container in between.
 - **Storage menu** (`Y`):
@@ -111,7 +111,8 @@ Keeps your hotbar and offhand stacks topped up from **restock shulker boxes**: s
 - When a hotbar or offhand stack drops below *Restock Below* (default 16), it's filled back to a full stack. For items that stack to 16, like ender pearls, at most half a stack is used as the limit. Fireworks in the offhand for elytra flight never run out while the box has some.
 - If you use the last item of a stack, the slot is refilled too.
 - Restock has **its own config page** and its own on/off switch with an optional toggle key. It works even when the TakeItOut options, or the rest of the mod (*Enable Mod*), are off.
-- The server moves the items, so it needs singleplayer/LAN or `containerautofill-server` on a Fabric server. It doesn't work in creative.
+- The server moves the items, so it needs singleplayer/LAN, or this mod on a Fabric server. It doesn't work in creative.
+- **Totems:** when a totem of undying in your offhand or hotbar pops, a new one from a restock box is put in the same slot straight away (*Restock Totems*). A totem you drop or move yourself isn't replaced.
 - A message tells you when an item you've been restocking runs out in your restock boxes (*Warn When Empty*).
 
 **Restock tab**
@@ -122,6 +123,7 @@ Keeps your hotbar and offhand stacks topped up from **restock shulker boxes**: s
 | Restock Name | restock | A shulker box counts if its name contains this word (not case-sensitive). |
 | Restock Below | 16 | Top a stack back up to full once it drops below this. |
 | Restock Offhand | on | Also restock the offhand. |
+| Restock Totems | on | Replace a totem of undying that pops, in the same slot. |
 | From Inventory Shulkers | on | Use restock boxes in your inventory. |
 | From Ender Chest | on | Use restock boxes in your ender chest. |
 | Warn When Empty | on | Message when a restocked item runs out. |
@@ -183,8 +185,7 @@ None of these defaults clash with vanilla, Litematica or MaLiLib defaults.
 ## Building
 
 ```bash
-./gradlew build                 # build/libs/containerautofill-<version>.jar (client)
-                                # build/libs/containerautofill-server-<version>.jar (Fabric server)
+./gradlew build                 # build/libs/containerautofill-<version>.jar (client and server)
 ./gradlew runClientGameTest     # automated in-game tests (needs a display, or xvfb-run)
 ```
 You need Java 21. The build uses the Gradle 9.8 wrapper and Fabric Loom 1.17.

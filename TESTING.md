@@ -10,7 +10,7 @@
 | A4 | No original packages | `unzip -l … \| grep -E 'maxbel\|mimicenzymes\|litematicafiller'` | no output |
 | A5 | Mixin targets remapped | `javap -v` on `ClientPlayerInteractionManagerMixin.class` | targets intermediary names (`method_2896` = `interactBlock`) |
 | A7 | In-game suite | `xvfb-run -a ./gradlew runClientGameTest` (or with a display) | `summary: N passed, 0 failed` in the log |
-| A8 | Server jar | `./gradlew :server:runServer` with `server/run/eula.txt` | `Shulker retrieval channel takeitout:getstack ready`, server reaches `Done` |
+| A8 | Same jar on a dedicated server | `./gradlew runServer` with `run/eula.txt` (Litematica and MaLiLib are client-only and get skipped) | `containerautofill` loads without Litematica/MaLiLib, server reaches `Done` |
 | A6 | Click planner | Exhaustive simulation of `ClickPlanner` with vanilla PICKUP rules: every source count 1..64, target 0..63, need 1..64, with max stack sizes 64, 16 and 1 | Every case reaches the exact target count with an empty cursor. The total item count never changes. Worst case is 18 clicks (135,297 cases). |
 
 ## B. In-game test setup
@@ -40,7 +40,7 @@
 | C9 | Wrong items, *Clear Wrong Items* **off** | Put dirt in a slot that expects stone, and in a slot the schematic leaves empty | Dirt stays in both slots. Chat says `1 slot(s) hold items the schematic doesn't expect…`. The other slots are filled. |
 | C10 | Wrong items, *Clear Wrong Items* **on** | Same as C9 with the option on | Dirt is shift-clicked into your inventory and the slot is filled with stone. The dirt in the unexpected slot is also removed. |
 | C11 | Items only in shulkers (singleplayer) | Expected items exist only inside a shulker box in your inventory. Keep at least one inventory slot free. | Action bar shows the item being requested. The item appears in your main hand and is clicked into the container. Repeats until done. |
-| C12 | Items only in shulkers (Fabric server) | Same as C11 on a Fabric dedicated server with `containerautofill-server` installed | Same as C11. |
+| C12 | Items only in shulkers (Fabric server) | Same as C11 on a Fabric dedicated server with the same jar installed | Same as C11. |
 | C13 | Items missing entirely | Remove some expected items from both inventory and shulkers | Everything else is filled. The action bar shows `…, Y items missing`. Chat lists ` - 12x Oak Planks` etc. |
 | C14 | Screen closed mid-fill | Set Click Delay to 10, start a fill, press `E`/`Esc` halfway | Stops right away with `Auto-fill cancelled: the container was closed.` No item is dropped, and the cursor stack goes back to your inventory. |
 | C15 | Cancel by hotkey | Press the hotkey again while filling | `Auto-fill cancelled.` plus a summary. |
@@ -51,7 +51,7 @@
 | C20 | Pick block from shulker (TakeItOut) | Survival, stone only inside a shulker box: middle-click real stone | Stone ends up in your hand. |
 | C21 | Schematic pick / easy place | Litematica easy place on, stone only in a shulker: use on a schematic stone block | The first use requests the stone, then easy place places it. |
 | C22 | Auto Take Out (R) | Press `R`, look at a schematic block you only have in a shulker | Chat shows `Auto Take Out is ON` and the block is pulled into your hand. |
-| C23 | Server without the handler | Fabric server without `containerautofill-server`, item only in a shulker | One chat warning that the server doesn't accept shulker requests. Only loose items are used and the rest is reported missing. No kicks. |
+| C23 | Server without the handler | Fabric server without this mod, item only in a shulker | One chat warning that the server doesn't accept shulker requests. Only loose items are used and the rest is reported missing. No kicks. |
 | C24 | Stacked shulkers | Two identical shulker boxes stacked together contain the item | Warning `Stacked shulker boxes can't be taken from…`. Nothing requested. |
 | C25 | Inventory full | Fill every inventory slot, item only in a shulker | No request is sent. Chat notes that your inventory is full. |
 | C26 | Hotkey outside containers | Press the auto-fill key in your own inventory screen, or with no screen | `Open a container first`, or nothing (the key is GUI-only). |
@@ -83,6 +83,8 @@
 | K2 | Restock from ender chest | 10 cobblestone in hotbar slot 3; box named "restock" with 64 in the ender chest | Slot 64, ender box keeps 10 |
 | K3–K4 | Not restocked | Box without the name; a stack of 20 (threshold 16) | Nothing changes |
 | K5 | Last item used | Threshold 1, place your last cobblestone | Slot refilled to 64 from the restock box |
+| K7–K8 | Totem pops | Totem in the offhand, lethal fall damage; restock box with totems carried / in the ender chest | Player survives and a new totem is in the offhand; the box has one fewer |
+| K9–K10 | Totem not replaced | Drop a hotbar totem with Q; Restock Totems off and a totem pops | Slot stays empty, box unchanged |
 | K6 | Restock off | Restock off, offhand 5 fireworks, restock box | Offhand stays 5 |
 | S9 | Dump | Dump key with cobblestone/dirt in main inventory, torches in hotbar | Main inventory moved into the dump chest, hotbar kept |
 | S10–S12 | Look At, groups | Look At iron; new group; switch back; share + import | Marked; group empty then restored; import copies all entries |
@@ -99,7 +101,7 @@
 | # | Case | Steps | Expected |
 |---|---|---|---|
 | D1 | Only allowed mods | Launch with Fabric API, Litematica, MaLiLib, this mod | Game reaches the title screen; `latest.log` shows `containerautofill 1.0.0+1.21.11` loaded |
-| D2 | Litematica missing | Remove Litematica from `mods/` | Fabric's "incompatible mods" screen/error: *Mod 'Container Auto Fill' requires any version ≥0.26.16 of mod 'litematica', which is missing* (no crash) |
+| D2 | Litematica missing on the client | Remove Litematica from `mods/` | The game stops at startup with *Container Auto Fill needs Litematica and MaLiLib on the client: litematica >=0.26.16 is missing* (the same jar on a dedicated server doesn't need them) |
 | D3 | Original mods installed alongside | Add TakeItOut or Litematica-Container-Filler | Fabric refuses to start with a clear "breaks" message naming the conflicting mod |
 
 ## E. Results log
@@ -121,3 +123,4 @@ Record each run here (date, version, environment, pass/fail per case).
 | 2026-10-02 | 1.0.0+1.21.11 | Cloud container, client gametests under Xvfb | Full suite 53/53 + 35/35. Single-item Buffer: buffer 1 places 3 blocks in 5 ticks (3 taken), buffer 3 in 3 ticks (3 taken, none spare) |
 | 2026-10-02 | 1.0.0+1.21.11 | Cloud container, client gametests under Xvfb | Full suite 53/53 + 40/40 (hotbar refill R1–R5 added; crafter known issue logged) |
 | 2026-10-02 | 1.0.0+1.21.11 | Cloud container, client gametests under Xvfb | Full suite 53/53 + 46/46 (Restock K1–K6 added; offhand restocked in 3 ticks with the rest of the mod off) |
+| 2026-10-02 | 1.0.0+1.21.11 | Single jar | A8 pass: `runServer` reaches Done with only containerautofill + Fabric API (Litematica/MaLiLib skipped as client-only). D2 pass: client without Litematica stops with "Container Auto Fill needs Litematica and MaLiLib on the client: litematica [>=0.26.16] is missing". Full suite 53/53 + 50/50 (totem K7–K10; popped totem replaced in 1 tick) |

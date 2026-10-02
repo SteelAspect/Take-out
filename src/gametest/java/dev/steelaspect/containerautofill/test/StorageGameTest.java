@@ -552,6 +552,9 @@ public class StorageGameTest implements FabricClientGameTest {
         context.waitTicks(20);
         check("K6 Restock off: nothing is restocked", clientCount(context, 40) == 5, "offhand=" + clientCount(context, 40));
 
+        context.runOnClient(client -> Configs.RESTOCK_ENABLED.setBooleanValue(true));
+        testRestockTotems(context, world);
+
         context.runOnClient(client -> {
             Configs.RESTOCK_ENABLED.setBooleanValue(true);
             Configs.SHULKER_PICK_BLOCK.setBooleanValue(true);
@@ -559,6 +562,85 @@ public class StorageGameTest implements FabricClientGameTest {
             Configs.HOTBAR_REFILL.setBooleanValue(true);
         });
         setPlayerInventory(world, Map.of());
+        context.waitTicks(5);
+    }
+
+    /** Client-side count of an item inside a shulker box in the player's inventory (safe inside waitFor). */
+    private static int clientInner(MinecraftClient client, int slot, Item item) {
+        var contents = dev.steelaspect.containerautofill.takeitout.ShulkerUtil.getContents(client.player.getInventory().getStack(slot));
+        return contents == null ? -1 : contents.stream().filter(st -> st.isOf(item)).mapToInt(ItemStack::getCount).sum();
+    }
+
+    /** Deals lethal fall damage so a held totem of undying pops. */
+    private void popTotem(ClientGameTestContext context, TestSingleplayerContext world) {
+        context.waitTicks(20); // past the hurt cooldown of any earlier hit
+        world.getServer().runCommand("damage @p 100 minecraft:fall");
+    }
+
+    /** K7-K10: a popped totem is replaced in the same slot; dropped totems and Restock Totems off are left alone. */
+    private void testRestockTotems(ClientGameTestContext context, TestSingleplayerContext world) {
+        Predicate<MinecraftClient> offhandTotem = c -> c.player.getOffHandStack().isOf(Items.TOTEM_OF_UNDYING);
+
+        // K7: offhand totem pops; a new one comes from a carried restock box.
+        setPlayerInventory(world, Map.of(40, stack(Items.TOTEM_OF_UNDYING, 1), 14, shulkerWith("Restock Totems", 0, stack(Items.TOTEM_OF_UNDYING, 3))));
+        context.waitFor(offhandTotem, 40);
+        popTotem(context, world);
+        boolean popped;
+        try {
+            context.waitFor(c -> !c.player.getOffHandStack().isOf(Items.TOTEM_OF_UNDYING) || clientInner(c, 14, Items.TOTEM_OF_UNDYING) < 3, 40);
+            popped = true;
+        } catch (Throwable t) {
+            popped = false;
+        }
+        int ticks;
+        try {
+            ticks = context.waitFor(c -> offhandTotem.test(c) && clientInner(c, 14, Items.TOTEM_OF_UNDYING) == 2, 60);
+        } catch (Throwable t) {
+            ticks = -1;
+        }
+        boolean alive = context.computeOnClient(c -> c.player.isAlive());
+        LOG.info("SPEED K7 popped totem replaced after {} ticks", ticks);
+        check("K7 popped offhand totem replaced from a carried restock box", popped && ticks >= 0 && alive,
+                "popped=" + popped + " offhand=" + context.computeOnClient(c -> c.player.getOffHandStack().toString())
+                        + " box=" + innerCount(world, false, 14, Items.TOTEM_OF_UNDYING) + " alive=" + alive);
+
+        // K8: the same with the restock box in the ender chest.
+        world.getServer().runOnServer(server -> player(server).getEnderChestInventory().setStack(5, shulkerWith("restock", 2, stack(Items.TOTEM_OF_UNDYING, 2))));
+        setPlayerInventory(world, Map.of(40, stack(Items.TOTEM_OF_UNDYING, 1)));
+        context.waitFor(offhandTotem, 40);
+        popTotem(context, world);
+        try {
+            context.waitFor(c -> !offhandTotem.test(c), 40); // popped
+            context.waitFor(offhandTotem, 60);              // replaced
+        } catch (Throwable ignored) {
+        }
+        check("K8 popped totem replaced from a restock box in the ender chest",
+                context.computeOnClient(offhandTotem::test) && innerCount(world, true, 5, Items.TOTEM_OF_UNDYING) == 1,
+                "offhand=" + context.computeOnClient(c -> c.player.getOffHandStack().toString()) + " ender box=" + innerCount(world, true, 5, Items.TOTEM_OF_UNDYING));
+        world.getServer().runOnServer(server -> player(server).getEnderChestInventory().clear());
+
+        // K9: dropping a totem (Q) is not a pop: nothing is restocked.
+        context.waitTicks(20); // well after the last pop
+        setPlayerInventory(world, Map.of(0, stack(Items.TOTEM_OF_UNDYING, 1), 14, shulkerWith("Restock", 0, stack(Items.TOTEM_OF_UNDYING, 3))));
+        context.runOnClient(client -> client.player.getInventory().setSelectedSlot(0));
+        context.waitFor(c -> c.player.getInventory().getStack(0).isOf(Items.TOTEM_OF_UNDYING), 40);
+        context.getInput().pressKey(options -> options.dropKey);
+        context.waitTicks(25);
+        check("K9 a dropped totem is not restocked", context.computeOnClient(c -> c.player.getInventory().getStack(0).isEmpty())
+                && innerCount(world, false, 14, Items.TOTEM_OF_UNDYING) == 3, "slot0=" + context.computeOnClient(c -> c.player.getInventory().getStack(0).toString()));
+        world.getServer().runCommand("kill @e[type=item]");
+
+        // K10: Restock Totems off: the popped totem isn't replaced.
+        context.runOnClient(client -> Configs.RESTOCK_TOTEMS.setBooleanValue(false));
+        setPlayerInventory(world, Map.of(40, stack(Items.TOTEM_OF_UNDYING, 1), 14, shulkerWith("Restock", 0, stack(Items.TOTEM_OF_UNDYING, 3))));
+        context.waitFor(offhandTotem, 40);
+        popTotem(context, world);
+        context.waitTicks(30);
+        check("K10 Restock Totems off: popped totem not replaced", context.computeOnClient(c -> c.player.getOffHandStack().isEmpty() && c.player.isAlive())
+                && innerCount(world, false, 14, Items.TOTEM_OF_UNDYING) == 3, "offhand=" + context.computeOnClient(c -> c.player.getOffHandStack().toString()));
+        context.runOnClient(client -> Configs.RESTOCK_TOTEMS.setBooleanValue(true));
+        world.getServer().runCommand("effect clear @p");
+        world.getServer().runCommand("effect give @p minecraft:instant_health 1 5");
         context.waitTicks(5);
     }
 

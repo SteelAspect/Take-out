@@ -40,6 +40,7 @@ import net.minecraft.client.MinecraftClient;
 public class ContainerAutoFillClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
+        if (!ClientRequirements.met()) return; // Litematica / MaLiLib missing: ClientRequirements reports it
         InitializationHandler.getInstance().registerInitializationHandler(() -> {
             Configs.INSTANCE.load();
             ConfigManager.getInstance().registerConfigHandler(Reference.MOD_ID, Configs.INSTANCE);

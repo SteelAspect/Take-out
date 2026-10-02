@@ -72,7 +72,7 @@ public final class ContainerHighlighter {
         }
 
         // Ask the server what is inside, so containers don't have to be opened to get a status. Works in
-        // singleplayer/LAN and on servers with containerautofill-server; otherwise use what we have.
+        // singleplayer/LAN and on servers that also run this mod; otherwise use what we have.
         Identifier dimension = client.world.getRegistryKey().getValue();
         boolean serverQueries = StorageContents.isSupported();
         if (serverQueries) {

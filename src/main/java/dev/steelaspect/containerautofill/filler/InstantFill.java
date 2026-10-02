@@ -30,7 +30,7 @@ import java.util.Set;
 
 /**
  * Server-side instant fill: the server puts every expected item into the container in one go, without
- * the container being opened. Needs the integrated server (singleplayer/LAN) or containerautofill-server.
+ * the container being opened. Needs the integrated server (singleplayer/LAN) or the mod installed on the server.
  */
 public final class InstantFill {
     private static final int TIMEOUT_TICKS = 100;

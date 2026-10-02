@@ -132,7 +132,7 @@ public final class AutoFillController {
 
     /**
      * Area key: instant-fills every placed schematic container within Area Fill Range that isn't already
-     * correct, nearest first. Needs server support (singleplayer/LAN or containerautofill-server).
+     * correct, nearest first. Needs server support (singleplayer/LAN, or the mod installed on the server).
      */
     public static void fillArea(MinecraftClient client) {
         if (client.player == null || client.world == null) return;

@@ -90,6 +90,7 @@ public class Configs implements IConfigHandler {
     public static final ConfigString RESTOCK_NAME = new ConfigString("restockName", "restock").apply(PREFIX);
     public static final ConfigInteger RESTOCK_THRESHOLD = new ConfigInteger("restockThreshold", 16, 1, 63).apply(PREFIX);
     public static final ConfigBoolean RESTOCK_OFFHAND = new ConfigBoolean("restockOffhand", true).apply(PREFIX);
+    public static final ConfigBoolean RESTOCK_TOTEMS = new ConfigBoolean("restockTotems", true).apply(PREFIX);
     public static final ConfigBoolean RESTOCK_FROM_INVENTORY = new ConfigBoolean("restockFromInventory", true).apply(PREFIX);
     public static final ConfigBoolean RESTOCK_FROM_ENDER_CHEST = new ConfigBoolean("restockFromEnderChest", true).apply(PREFIX);
     public static final ConfigBoolean RESTOCK_WARN_EMPTY = new ConfigBoolean("restockWarnEmpty", true).apply(PREFIX);
@@ -99,6 +100,7 @@ public class Configs implements IConfigHandler {
             RESTOCK_NAME,
             RESTOCK_THRESHOLD,
             RESTOCK_OFFHAND,
+            RESTOCK_TOTEMS,
             RESTOCK_FROM_INVENTORY,
             RESTOCK_FROM_ENDER_CHEST,
             RESTOCK_WARN_EMPTY
