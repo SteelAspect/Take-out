@@ -170,6 +170,8 @@ public class StorageGameTest implements FabricClientGameTest {
         context.runOnClient(client -> DataManager.getSchematicPlacementManager()
                 .addSchematicPlacement(SchematicPlacement.createFor(schematic, fillLeft, "instant-fill-test", true, true), false));
         world.getServer().runCommand("gamemode survival @a");
+        world.getServer().runCommand("gamerule announceAdvancements false");
+        world.getServer().runCommand("advancement grant @a everything");
         overworld = context.computeOnClient(client -> client.world.getRegistryKey().getValue());
         context.waitTicks(10);
     }
@@ -437,6 +439,11 @@ public class StorageGameTest implements FabricClientGameTest {
         check("Q2 hopper (glass in, TNT missing) reads PARTIAL from the server without opening it",
                 statuses.get(fillHopper) == dev.steelaspect.containerautofill.highlight.ContainerStatus.PARTIAL, "hopper=" + statuses.get(fillHopper));
 
+        overviewShot(context, world, "area-fill-1-before");
+        world.getServer().runCommand(String.format(Locale.ROOT, "tp @p %.1f %d %.1f 180 30",
+                area1.getX() + 1.5, area1.getY(), area1.getZ() + 2.5));
+        context.waitTicks(15);
+
         var before = dev.steelaspect.containerautofill.filler.AutoFillController.getLastResult();
         boolean[] screenOpened = {false};
         context.getInput().holdKey(GLFW.GLFW_KEY_LEFT_SHIFT);
@@ -459,6 +466,12 @@ public class StorageGameTest implements FabricClientGameTest {
         check("A3 correct containers skipped, out-of-range double chest untouched",
                 matches(contents(world, fillHopper), Map.of(0, stack(Items.GLASS, 3))) && contents(world, fillLeft).size() == 3,
                 "hopper=" + contents(world, fillHopper));
+        // Back to the overview straight away, so the action bar summary is still showing.
+        world.getServer().runCommand(String.format(Locale.ROOT, "tp @p %.1f %d %.1f 180 32",
+                fillLeft.getX() + 6.5, fillLeft.getY() + 3, fillLeft.getZ() + 7.5));
+        context.waitTicks(12);
+        context.runOnClient(client -> client.inGameHud.getChatHud().clear(false));
+        LOG.info("Screenshot: {}", context.takeScreenshot("area-fill-2-after"));
         var after = waitForStatus(context, area1, s -> s == dev.steelaspect.containerautofill.highlight.ContainerStatus.CORRECT);
         check("Q3 highlight turns CORRECT after area fill", after.get(area1) == dev.steelaspect.containerautofill.highlight.ContainerStatus.CORRECT,
                 "area1=" + after.get(area1));
@@ -500,6 +513,19 @@ public class StorageGameTest implements FabricClientGameTest {
         context.runOnClient(client -> Configs.INSTANT_FILL.setBooleanValue(true));
         world.getServer().runCommand("gamemode survival @a");
         context.waitTicks(5);
+    }
+
+    /** Wide view of the schematic row (double chest, hopper, area chests) from behind and above. */
+    private void overviewShot(ClientGameTestContext context, TestSingleplayerContext world, String name) {
+        world.getServer().runCommand(String.format(Locale.ROOT, "tp @p %.1f %d %.1f 180 32",
+                fillLeft.getX() + 6.5, fillLeft.getY() + 3, fillLeft.getZ() + 7.5));
+        context.waitTicks(25);
+        context.runOnClient(client -> {
+            client.inGameHud.getChatHud().clear(false);
+            client.getToastManager().clear();
+        });
+        context.waitTicks(2);
+        LOG.info("Screenshot: {}", context.takeScreenshot(name));
     }
 
     private Map<BlockPos, dev.steelaspect.containerautofill.highlight.ContainerStatus> waitForStatus(ClientGameTestContext context, BlockPos pos,
