@@ -510,6 +510,8 @@ public class ContainerAutoFillClientGameTest implements FabricClientGameTest {
         assertContents("C6 dispenser filled with what exists", containerContents(world, dispenser), Map.of(0, stack(Items.ARROW, 16)));
         FillResult r = AutoFillController.getLastResult();
         check("C13 missing items counted (TNT x2 + damaged flint and steel)", r.missingItems() == 3 && r.filledSlots() == 1, "result " + r);
+        context.waitTicks(2);
+        LOG.info("Chat summary screenshot: {}", context.takeScreenshot("chat-summary"));
         check("C13 undamaged tool not used for damaged slot", countPlayer(world, s -> s.isOf(Items.FLINT_AND_STEEL)) == 1, "flint and steel moved");
     }
 
