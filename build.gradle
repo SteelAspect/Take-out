@@ -1,0 +1,66 @@
+plugins {
+    id 'fabric-loom' version "${loom_version}"
+}
+
+version = project.mod_version
+group = project.maven_group
+
+base {
+    archivesName = project.archives_base_name
+}
+
+repositories {
+    // Litematica and MaLiLib are only published to Modrinth for 1.21.11.
+    exclusiveContent {
+        forRepository {
+            maven { name = 'Modrinth'; url = 'https://api.modrinth.com/maven' }
+        }
+        filter { includeGroup 'maven.modrinth' }
+    }
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
+    modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+
+    modImplementation "maven.modrinth:litematica:${project.litematica_modrinth_id}"
+    modImplementation "maven.modrinth:malilib:${project.malilib_modrinth_id}"
+}
+
+processResources {
+    def props = [
+            version          : project.version,
+            minecraft_version: project.minecraft_version,
+            loader_version   : project.loader_version,
+            litematica_version: project.litematica_version,
+            malilib_version  : project.malilib_version
+    ]
+    inputs.properties props
+    filesMatching('fabric.mod.json') {
+        expand props
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    it.options.encoding = 'UTF-8'
+    it.options.release = 21
+    it.options.compilerArgs << '-Xlint:deprecation' << '-Xlint:unchecked'
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+    withSourcesJar()
+}
+
+jar {
+    def archiveSuffix = project.base.archivesName.get()
+    from('LICENSE') {
+        rename { "${it}_${archiveSuffix}" }
+    }
+    from('COPYING.GPL') {
+        rename { "${it}_${archiveSuffix}" }
+    }
+}

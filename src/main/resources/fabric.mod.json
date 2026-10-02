@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "id": "containerautofill",
+  "version": "${version}",
+  "name": "Container Auto Fill",
+  "description": "Fills containers to match your Litematica schematic, and pulls missing items out of shulker boxes in your inventory (TakeItOut-compatible).",
+  "authors": ["steelaspect"],
+  "contact": {
+    "sources": "https://github.com/SteelAspect/Take-out",
+    "issues": "https://github.com/SteelAspect/Take-out/issues"
+  },
+  "license": "LGPL-3.0-only",
+  "environment": "client",
+  "entrypoints": {
+    "main": ["dev.steelaspect.containerautofill.ContainerAutoFill"],
+    "client": ["dev.steelaspect.containerautofill.ContainerAutoFillClient"]
+  },
+  "mixins": [
+    "containerautofill.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "minecraft": "${minecraft_version}",
+    "fabric-api": "*",
+    "litematica": ">=${litematica_version}",
+    "malilib": ">=${malilib_version}"
+  },
+  "breaks": {
+    "takeitout": "*",
+    "litematica_container_filler": "*"
+  }
+}
