@@ -243,9 +243,10 @@ public class ContainerAutoFillClientGameTest implements FabricClientGameTest {
     }
 
     private void lookAt(ClientGameTestContext context, TestSingleplayerContext world, BlockPos target) {
-        world.getServer().runCommand(String.format("tp @p %.1f %d %.1f facing %.1f %.1f %.1f",
-                target.getX() + 0.5, target.getY(), target.getZ() + 2.5,
-                target.getX() + 0.5, target.getY() + 0.5, target.getZ() + 0.5));
+        // Stand 2 blocks south of the target and aim from eye height (1.62) at the block centre.
+        float pitch = (float) Math.toDegrees(Math.atan2(1.62 - 0.5, 2.0));
+        world.getServer().runCommand(String.format(java.util.Locale.ROOT, "tp @p %.1f %d %.1f 180 %.2f",
+                target.getX() + 0.5, target.getY(), target.getZ() + 2.5, pitch));
         context.runOnClient(client -> client.player.getInventory().setSelectedSlot(0));
         context.waitTicks(5);
     }
@@ -281,6 +282,14 @@ public class ContainerAutoFillClientGameTest implements FabricClientGameTest {
             fail(name, "fill did not finish (running=" + AutoFillController.isRunning() + ", lastMessage=" + AutoFillController.getLastMessageKey() + ")");
             return -1;
         }
+    }
+
+    private static boolean clientHas(MinecraftClient client, Item item) {
+        PlayerInventory inv = client.player.getInventory();
+        for (int i = 0; i < inv.size(); i++) {
+            if (inv.getStack(i).isOf(item)) return true;
+        }
+        return false;
     }
 
     private Map<Integer, ItemStack> containerContents(TestSingleplayerContext world, BlockPos pos) {
@@ -490,8 +499,11 @@ public class ContainerAutoFillClientGameTest implements FabricClientGameTest {
         FillResult r = AutoFillController.getLastResult();
         int inBox = containerContents(world, shulkerBox).values().stream().mapToInt(ItemStack::getCount).sum();
         int inPlayer = countPlayer(world, s -> s.isOf(Items.COBBLESTONE));
-        int dropped = world.getServer().computeOnServer(server -> server.getOverworld()
-                .getEntitiesByClass(ItemEntity.class, new net.minecraft.util.math.Box(base).expand(30), e -> true).size());
+        int dropped = world.getServer().computeOnServer(server -> {
+            List<ItemEntity> items = server.getOverworld().getEntitiesByClass(ItemEntity.class, new net.minecraft.util.math.Box(base).expand(30), e -> true);
+            items.forEach(e -> LOG.info("Item entity near test area: {}", e.getStack()));
+            return (int) items.stream().filter(e -> e.getStack().isOf(Items.COBBLESTONE)).count();
+        });
         check("C14 fill was running when screen closed", wasRunning, "fill had already finished");
         check("C14 cancelled safely", r != before && r.cancelled() && !AutoFillController.isRunning(), "result " + r);
         check("C14 no items lost or dropped", inBox + inPlayer == 27 * 64 && dropped == 0,
@@ -504,8 +516,7 @@ public class ContainerAutoFillClientGameTest implements FabricClientGameTest {
         lookAt(context, world, emerald);
         context.getInput().pressKey(options -> options.pickItemKey);
         try {
-            context.waitFor(client -> world.getServer().computeOnServer(server ->
-                    player(server).getMainHandStack().isOf(Items.EMERALD_BLOCK)), 100);
+            context.waitFor(client -> client.player.getMainHandStack().isOf(Items.EMERALD_BLOCK), 100);
             check("C20 vanilla pick block pulls from shulker", true, "");
         } catch (Throwable t) {
             fail("C20 vanilla pick block pulls from shulker", "emerald block not in main hand");
@@ -519,7 +530,7 @@ public class ContainerAutoFillClientGameTest implements FabricClientGameTest {
         context.waitTicks(2);
         check("C22 R toggles Auto Take Out on", Configs.AUTO_TAKE_OUT.getBooleanValue(), "still off");
         try {
-            context.waitFor(client -> countPlayer(world, s -> s.isOf(Items.LAPIS_BLOCK)) > 0, 200);
+            context.waitFor(client -> clientHas(client, Items.LAPIS_BLOCK), 200);
             check("C21/C22 schematic block pulled from shulker (Litematica pick path)", true, "");
         } catch (Throwable t) {
             fail("C21/C22 schematic block pulled from shulker (Litematica pick path)", "lapis block never arrived");
@@ -544,8 +555,8 @@ public class ContainerAutoFillClientGameTest implements FabricClientGameTest {
             server.runCommand(String.format("setblock %d %d %d minecraft:emerald_block", block.getX(), block.getY(), block.getZ()));
             server.runCommand("clear @a");
             server.runCommand("give @a minecraft:lime_shulker_box[minecraft:container=[{slot:2,item:{id:\"minecraft:emerald_block\",count:10}}]]");
-            server.runCommand(String.format("tp @a %.1f %d %.1f facing %.1f %.1f %.1f",
-                    block.getX() + 0.5, block.getY(), block.getZ() + 2.5, block.getX() + 0.5, block.getY() + 0.5, block.getZ() + 0.5));
+            server.runCommand(String.format(java.util.Locale.ROOT, "tp @a %.1f %d %.1f 180 %.2f",
+                    block.getX() + 0.5, block.getY(), block.getZ() + 2.5, (float) Math.toDegrees(Math.atan2(1.12, 2.0))));
             context.waitTicks(10);
             context.getInput().pressKey(options -> options.pickItemKey);
             context.waitTicks(40);
