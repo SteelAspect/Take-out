@@ -47,6 +47,7 @@ public class Configs implements IConfigHandler {
 
     // --- Linked storage (TakeItOut tab) ---
     public static final ConfigBooleanHotkeyed SINGLE_ITEM_MODE = new ConfigBooleanHotkeyed("singleItemMode", false, "B").apply(PREFIX);
+    public static final ConfigInteger SINGLE_ITEM_BUFFER = new ConfigInteger("singleItemBuffer", 3, 1, 16).apply(PREFIX);
     public static final ConfigBoolean USE_LINKED_CONTAINERS = new ConfigBoolean("useLinkedContainers", true).apply(PREFIX);
     public static final ConfigBooleanHotkeyed LINKED_OUTLINES = new ConfigBooleanHotkeyed("linkedOutlines", true, "").apply(PREFIX);
     public static final ConfigBoolean LINKED_OUTLINES_THROUGH_WALLS = new ConfigBoolean("linkedOutlinesThroughWalls", true).apply(PREFIX);
@@ -70,6 +71,7 @@ public class Configs implements IConfigHandler {
     public static final ImmutableList<IConfigBase> TAKEITOUT = ImmutableList.of(
             AUTO_TAKE_OUT,
             SINGLE_ITEM_MODE,
+            SINGLE_ITEM_BUFFER,
             SHULKER_PICK_BLOCK,
             USE_TAKEITOUT_SOURCES,
             USE_LINKED_CONTAINERS,

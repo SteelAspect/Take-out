@@ -46,12 +46,15 @@ public final class TakeItOutFeatures {
     /** Item an easy place attempt is waiting for; easy place runs again the moment it arrives. */
     private static ItemStack retryItem = ItemStack.EMPTY;
     private static long retryUntil;
+    /** Single-item buffer: the item easy place is pulling from storage, topped up while the key is held. */
+    private static ItemStack bufferItem = ItemStack.EMPTY;
 
     private TakeItOutFeatures() {
     }
 
     public static void reset() {
         retryItem = ItemStack.EMPTY;
+        bufferItem = ItemStack.EMPTY;
     }
 
     public static void toggleAutoTakeOut(MinecraftClient client) {
@@ -67,6 +70,7 @@ public final class TakeItOutFeatures {
         boolean useDown = client.options.useKey.isPressed();
         boolean useClicked = useDown && !useKeyWasDown;
         useKeyWasDown = useDown;
+        topUpBuffer(client);
 
         if (!Configs.AUTO_TAKE_OUT.getBooleanValue()) return;
         if (client.player == null || client.world == null || client.currentScreen != null) return;
@@ -107,8 +111,35 @@ public final class TakeItOutFeatures {
         if (requested && fi.dy.masa.litematica.config.Configs.Generic.EASY_PLACE_MODE.getBooleanValue()) {
             retryItem = required.copyWithCount(1);
             retryUntil = ticks + RETRY_WINDOW_TICKS;
+            if (StorageRetriever.isWaitingFor(required)) bufferItem = required.copyWithCount(1);
         }
         return requested;
+    }
+
+    /**
+     * Single-item Buffer: while easy place is held, pull the next few items of the block being placed
+     * from linked storage before the last one is used, so placing never waits for the server.
+     */
+    private static void topUpBuffer(MinecraftClient client) {
+        if (bufferItem.isEmpty()) return;
+        int buffer = Configs.SINGLE_ITEM_BUFFER.getIntegerValue();
+        if (client.player == null || client.currentScreen != null || buffer <= 1 || !Configs.SINGLE_ITEM_MODE.getBooleanValue()
+                || !fi.dy.masa.litematica.config.Configs.Generic.EASY_PLACE_MODE.getBooleanValue()
+                || !Hotkeys.EASY_PLACE_ACTIVATION.getKeybind().isKeybindHeld()) {
+            bufferItem = ItemStack.EMPTY;
+            return;
+        }
+        ItemStack item = bufferItem;
+        if (StorageRetriever.isWaitingFor(item)) return;
+        Predicate<ItemStack> matcher = s -> ItemStack.areItemsAndComponentsEqual(s, item);
+        int have = ShulkerRetriever.countInInventory(client.player.getInventory(), matcher);
+        // At 0 the next pick block asks for it anyway; top up once the last one is in use.
+        if (have != 1) return;
+        if (StorageRetriever.request(client, matcher, buffer, false)) {
+            Configs.debug("Single-item buffer: topping up {}x {}", buffer, item);
+        } else {
+            bufferItem = ItemStack.EMPTY;
+        }
     }
 
     /**
@@ -158,7 +189,7 @@ public final class TakeItOutFeatures {
     /** Shulker in the inventory first (like TakeItOut), then linked storage; the item goes to the main hand. */
     private static boolean requestFromAnySource(MinecraftClient client, ItemStack required, Predicate<ItemStack> matcher) {
         if (ShulkerRetriever.request(client, required, matcher) == ShulkerRetriever.Outcome.REQUESTED) return true;
-        int count = Configs.SINGLE_ITEM_MODE.getBooleanValue() ? 1 : required.getMaxCount();
+        int count = Configs.SINGLE_ITEM_MODE.getBooleanValue() ? Configs.SINGLE_ITEM_BUFFER.getIntegerValue() : required.getMaxCount();
         return StorageRetriever.request(client, matcher, count, true);
     }
 

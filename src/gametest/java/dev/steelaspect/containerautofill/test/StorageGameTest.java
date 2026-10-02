@@ -373,33 +373,52 @@ public class StorageGameTest implements FabricClientGameTest {
             StorageActions.refreshAll();
         });
         context.waitTicks(20);
-        int before = containerCount(world, chestA, Items.STONE);
-        context.getInput().holdMouse(GLFW.GLFW_MOUSE_BUTTON_RIGHT);
-        int placeTicks;
-        try {
-            placeTicks = context.waitFor(client -> row.stream().allMatch(p -> client.world.getBlockState(p).isOf(Blocks.STONE)), 200);
-        } catch (Throwable t) {
-            placeTicks = -1;
+        // P3/P4: Single-item Buffer 1 (strictly one item per pull). P5: buffer 3 (pulls ahead).
+        for (int buffer : new int[]{1, 3}) {
+            int size = buffer;
+            world.getServer().runOnServer(server -> {
+                for (BlockPos p : row) server.getOverworld().setBlockState(p, Blocks.AIR.getDefaultState());
+                player(server).getInventory().clear();
+            });
+            context.runOnClient(client -> {
+                Configs.SINGLE_ITEM_BUFFER.setIntegerValue(size);
+                StorageActions.refreshAll();
+            });
+            context.waitTicks(45); // Litematica won't re-place a position within 2 s of placing it
+            int before = containerCount(world, chestA, Items.STONE);
+            context.getInput().holdMouse(GLFW.GLFW_MOUSE_BUTTON_RIGHT);
+            int placeTicks;
+            try {
+                placeTicks = context.waitFor(client -> row.stream().allMatch(p -> client.world.getBlockState(p).isOf(Blocks.STONE)), 200);
+            } catch (Throwable t) {
+                placeTicks = -1;
+            }
+            context.getInput().releaseMouse(GLFW.GLFW_MOUSE_BUTTON_RIGHT);
+            context.waitTicks(10);
+            LOG.info("P3 row after: {}", (Object) context.<String, RuntimeException>computeOnClient(client -> row.stream()
+                    .map(p -> client.world.getBlockState(p).getBlock().getName().getString()).toList().toString()));
+            int taken = before - containerCount(world, chestA, Items.STONE);
+            int left = serverCount(world, isStone);
+            LOG.info("SPEED P3 easy place, single-item buffer {}: 3 blocks placed in {} ticks, {} stone taken, {} left over", buffer, placeTicks, taken, left);
+            if (buffer == 1) {
+                check("P3 easy place with single-item mode places all 3 blocks", placeTicks >= 0, "not all placed");
+                check("P4 buffer 1 takes exactly 1 item per block", taken == 3 && left == 0, "taken=" + taken + " left=" + left);
+            } else {
+                check("P5 buffer 3 places all 3 blocks, at most 3 items left over, none lost",
+                        placeTicks >= 0 && left <= buffer && taken == 3 + left, "ticks=" + placeTicks + " taken=" + taken + " left=" + left);
+            }
         }
-        context.getInput().releaseMouse(GLFW.GLFW_MOUSE_BUTTON_RIGHT);
-        context.waitTicks(5);
         context.runOnClient(client -> {
             fi.dy.masa.litematica.config.Configs.Generic.EASY_PLACE_MODE.setBooleanValue(false);
             fi.dy.masa.litematica.config.Configs.Generic.EASY_PLACE_FIRST.setBooleanValue(true);
             Configs.SINGLE_ITEM_MODE.setBooleanValue(false);
+            Configs.SINGLE_ITEM_BUFFER.setIntegerValue(3);
             Configs.DEBUG_LOGGING.setBooleanValue(false);
             var manager = DataManager.getSchematicPlacementManager();
             for (SchematicPlacement placement : new ArrayList<>(manager.getAllSchematicsPlacements())) {
                 if ("speed-row".equals(placement.getName())) manager.removeSchematicPlacement(placement);
             }
         });
-        LOG.info("P3 row after: {}", (Object) context.<String, RuntimeException>computeOnClient(client -> row.stream()
-                .map(p -> client.world.getBlockState(p).getBlock().getName().getString()).toList().toString()));
-        int taken = before - containerCount(world, chestA, Items.STONE);
-        LOG.info("SPEED P3 easy place, single-item mode: 3 blocks placed in {} ticks, {} stone taken from storage", placeTicks, taken);
-        check("P3 easy place with single-item mode places all 3 blocks", placeTicks >= 0, "not all placed");
-        check("P4 single-item mode took exactly 1 item per block", taken == 3 && serverCount(world, isStone) == 0,
-                "taken=" + taken + " left in inventory=" + serverCount(world, isStone));
     }
 
     private void testDump(ClientGameTestContext context, TestSingleplayerContext world) {
