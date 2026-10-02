@@ -79,6 +79,10 @@
 | I1–I5 | Instant fill (`V`) | Double chest: stone loose, iron only in an inventory shulker, emerald/gold/named diamond only in linked chests (one 160 blocks away) | No screen opens; both halves exact; items really moved from shulker and far chest; nothing missing |
 | I6–I7 | Instant fill, wrong items | Hopper with dirt where glass is expected; TNT unavailable | Clear Wrong off: dirt kept, wrong + missing reported. On: dirt to inventory, glass filled |
 
+| Q1–Q3 | Status from the server | Never open the containers | Empty chest reads EMPTY, half-filled hopper PARTIAL; turns CORRECT right after a fill |
+| A1–A3 | Area fill (`Shift`+`V`), range 5 | Two empty schematic chests nearby, one 14 blocks away, a correct hopper, a double chest just out of range | Both nearby filled without opening; far chest and out-of-range double chest untouched; correct hopper skipped |
+| C1–C2 (storage) | Creative fill | Creative, empty inventory, nothing linked; instant fill, then click fallback (Instant Fill off) | Both containers filled exactly, including a named item |
+
 ## D. Dependency / launch tests
 
 | # | Case | Steps | Expected |
@@ -100,4 +104,5 @@ Record each run here (date, version, environment, pass/fail per case).
 | 2026-10-02 | 1.0.0+1.21.11 | :server:runServer | A8 pass: containerautofill_server loaded, channel registered, server started/stopped |
 | 2026-10-02 | 1.0.0+1.21.11 | runClientGameTest (main + storage + menus), Xvfb | 53/53 + 14/14 pass (crafter known issue logged) |
 | 2026-10-02 | 1.0.0+1.21.11 | runClientGameTest (main + storage/instant + menus), Xvfb | 53/53 + 22/22 pass (crafter known issue logged) |
+| 2026-10-02 | 1.0.0+1.21.11 | runClientGameTest (main + storage/instant/area/creative + menus), Xvfb | 53/53 + 30/30 pass (crafter known issue logged) |
 | – | – | Not testable here | C12 (needs a separate Fabric server + client connection), D3 (needs the original mods' jars) |

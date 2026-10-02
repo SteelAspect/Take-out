@@ -56,7 +56,7 @@ Placed schematic containers within *Highlight Range* get a see-through coloured 
 | grey | contents not known yet |
 
 - In singleplayer and LAN the highlight is always live.
-- On a Fabric server, a container's colour is known once you've opened it (it's remembered afterwards). It's live if the server runs **Servux** and Litematica's *entityDataSync* is on.
+- **No need to open containers:** the colours come from the server reading each container's contents, in singleplayer/LAN and on Fabric servers with `containerautofill-server`. On other servers, a container's colour is known once you've opened it (it's remembered afterwards), or live with **Servux** and Litematica's *entityDataSync* on.
 - A container whose block differs from the schematic (e.g. a barrel instead of a chest) isn't highlighted.
 - Toggle the highlight with *Highlight Containers*, which has an optional hotkey. Colours, range, see-through mode and hiding green/grey boxes are all configurable.
 
@@ -69,7 +69,11 @@ Look at a schematic container and press **V**. With **Instant Fill** on (the def
 
 Double chests, crafter slot locks and *Clear Wrong Items* are handled the same way as the click-based fill. The action bar shows "Filled X slots, Y items missing" and chat lists what's missing.
 
-Instant Fill needs singleplayer/LAN, or a Fabric server with `containerautofill-server`. Without either (or with Instant Fill turned off), `V` falls back to the original behaviour from Litematica-Container-Filler: it opens the container, fills it with clicks and closes it again (*Close After Look Fill*).
+**Area fill (`Shift + V`):** instant-fills every placed schematic container within *Area Fill Range* (default 16 blocks) that isn't already correct, nearest first, all at once and without opening anything. Nearer containers get items first if there aren't enough for all.
+
+**Creative mode:** with *Creative Fill* on (the default), every fill gives containers exactly what the schematic expects, whether or not you have the items anywhere. Instant and area fill do this on the server, which checks that you're really in creative. The click-based fallback uses vanilla's creative inventory to make each item, then clicks it in.
+
+Instant Fill and Area Fill need singleplayer/LAN, or a Fabric server with `containerautofill-server`. Without either (or with Instant Fill turned off), `V` falls back to the original behaviour from Litematica-Container-Filler: it opens the container, fills it with clicks and closes it again (*Close After Look Fill*).
 
 ### 4. TakeItOut behaviour (shulker retrieval)
 - **Pick block from shulkers.** If you pick a block with vanilla middle-click, Litematica's schematic pick-block or easy place, and you don't carry it loose, the mod pulls it from a shulker box in your inventory into your hand.
@@ -104,6 +108,7 @@ Link containers once, then take items from them, or put items into them, **from 
 | Hotkey | Default | Notes |
 |---|---|---|
 | Auto Fill Open Container | *(unbound)* | Only while a container screen is open. Press again to cancel. |
+| Area Fill | `Shift` + `V` | Instant-fills every schematic container within Area Fill Range. |
 | Fill Looked At Container | `V` | In game, no screen open. |
 | Auto Take Out (toggle) | `R` | Same default as TakeItOut. |
 | Open Config GUI | `L` + `C` | The config is also listed in MaLiLib's config menu. |
@@ -119,6 +124,8 @@ None of these defaults clash with vanilla, Litematica or MaLiLib defaults.
 | Option | Default | Description |
 |---|---|---|
 | Enable Mod | on | Turns every feature on or off. |
+| Area Fill Range | 16 | Blocks around you that `Shift + V` fills. |
+| Creative Fill | on | In creative, fill containers completely without needing the items. |
 | Instant Fill | on | `V` fills the container server-side in one go without opening it. |
 | Click Delay (ticks) | 1 | Ticks between automated clicks. 1 means one click per tick. Raise it if a server complains about fast clicking. |
 | Clear Wrong Items | **off** | Shift-click unexpected items out of the container before filling. |
