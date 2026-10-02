@@ -5,6 +5,7 @@
  */
 package dev.steelaspect.containerautofill;
 
+import dev.steelaspect.containerautofill.network.StorageServerHandler;
 import dev.steelaspect.containerautofill.takeitout.GetStackPayload;
 import dev.steelaspect.containerautofill.takeitout.ShulkerStackServerHandler;
 import net.fabricmc.api.ModInitializer;
@@ -23,5 +24,6 @@ public class ContainerAutoFill implements ModInitializer {
         // order, before a vanilla pick-block packet sent right after it.
         ServerPlayNetworking.registerGlobalReceiver(GetStackPayload.ID, (payload, context) ->
                 ShulkerStackServerHandler.handle(context.player(), payload.slot(), payload.shulker()));
+        StorageServerHandler.register();
     }
 }

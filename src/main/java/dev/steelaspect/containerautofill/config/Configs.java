@@ -42,6 +42,15 @@ public class Configs implements IConfigHandler {
     public static final ConfigBooleanHotkeyed AUTO_TAKE_OUT = new ConfigBooleanHotkeyed("autoTakeOut", false, "R").apply(PREFIX);
     public static final ConfigBoolean DEBUG_LOGGING = new ConfigBoolean("debugLogging", false).apply(PREFIX);
 
+    // --- Linked storage (TakeItOut tab) ---
+    public static final ConfigBooleanHotkeyed SINGLE_ITEM_MODE = new ConfigBooleanHotkeyed("singleItemMode", false, "B").apply(PREFIX);
+    public static final ConfigBoolean USE_LINKED_CONTAINERS = new ConfigBoolean("useLinkedContainers", true).apply(PREFIX);
+    public static final ConfigBooleanHotkeyed LINKED_OUTLINES = new ConfigBooleanHotkeyed("linkedOutlines", true, "").apply(PREFIX);
+    public static final ConfigBoolean LINKED_OUTLINES_THROUGH_WALLS = new ConfigBoolean("linkedOutlinesThroughWalls", true).apply(PREFIX);
+    public static final ConfigColor LINKED_OUTLINE_COLOR = new ConfigColor("linkedOutlineColor", "0xFF22C55E").apply(PREFIX);
+    public static final ConfigColor DUMP_OUTLINE_COLOR = new ConfigColor("dumpOutlineColor", "0xFFF59E0B").apply(PREFIX);
+    public static final ConfigBoolean BOX_SELECT_CREATES_NEW_GROUP = new ConfigBoolean("boxSelectCreatesNewGroup", false).apply(PREFIX);
+
     public static final ImmutableList<IConfigBase> GENERIC = ImmutableList.of(
             ENABLE_MOD,
             CLICK_DELAY,
@@ -54,8 +63,15 @@ public class Configs implements IConfigHandler {
     /** TakeItOut behaviour: pulling items out of shulker boxes in the inventory. */
     public static final ImmutableList<IConfigBase> TAKEITOUT = ImmutableList.of(
             AUTO_TAKE_OUT,
+            SINGLE_ITEM_MODE,
             SHULKER_PICK_BLOCK,
-            USE_TAKEITOUT_SOURCES
+            USE_TAKEITOUT_SOURCES,
+            USE_LINKED_CONTAINERS,
+            LINKED_OUTLINES,
+            LINKED_OUTLINES_THROUGH_WALLS,
+            LINKED_OUTLINE_COLOR,
+            DUMP_OUTLINE_COLOR,
+            BOX_SELECT_CREATES_NEW_GROUP
     );
 
     // --- Highlight ---
@@ -84,7 +100,7 @@ public class Configs implements IConfigHandler {
     );
 
     /** Boolean options with a toggle hotkey. */
-    public static final ImmutableList<ConfigBooleanHotkeyed> TOGGLES = ImmutableList.of(AUTO_TAKE_OUT, HIGHLIGHT_CONTAINERS);
+    public static final ImmutableList<ConfigBooleanHotkeyed> TOGGLES = ImmutableList.of(AUTO_TAKE_OUT, HIGHLIGHT_CONTAINERS, SINGLE_ITEM_MODE, LINKED_OUTLINES);
 
     // --- Hotkeys ---
     /** Fills the container whose screen is currently open. Unbound by default; only fires inside a GUI. */
@@ -92,11 +108,21 @@ public class Configs implements IConfigHandler {
     /** Opens and fills the schematic container under the crosshair. */
     public static final ConfigHotkey FILL_LOOKED_AT_CONTAINER = new ConfigHotkey("fillLookedAtContainer", "V").apply(PREFIX);
     public static final ConfigHotkey OPEN_CONFIG_GUI = new ConfigHotkey("openConfigGui", "L,C").apply(PREFIX);
+    public static final ConfigHotkey OPEN_STORAGE_MENU = new ConfigHotkey("openStorageMenu", "Y").apply(PREFIX);
+    public static final ConfigHotkey LINK_LOOKED_AT = new ConfigHotkey("linkLookedAtContainer", "H").apply(PREFIX);
+    public static final ConfigHotkey BOX_SELECT_CORNER = new ConfigHotkey("boxSelectCorner", "").apply(PREFIX);
+    public static final ConfigHotkey MARK_DUMP_CONTAINER = new ConfigHotkey("markDumpContainer", "").apply(PREFIX);
+    public static final ConfigHotkey DUMP_TO_CONTAINERS = new ConfigHotkey("dumpToContainers", "").apply(PREFIX);
 
     public static final List<ConfigHotkey> HOTKEYS = ImmutableList.of(
             AUTO_FILL_OPEN_CONTAINER,
             FILL_LOOKED_AT_CONTAINER,
-            OPEN_CONFIG_GUI
+            OPEN_CONFIG_GUI,
+            OPEN_STORAGE_MENU,
+            LINK_LOOKED_AT,
+            BOX_SELECT_CORNER,
+            MARK_DUMP_CONTAINER,
+            DUMP_TO_CONTAINERS
     );
 
     private Configs() {

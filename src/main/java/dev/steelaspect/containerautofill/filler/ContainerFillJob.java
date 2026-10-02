@@ -6,6 +6,7 @@
 package dev.steelaspect.containerautofill.filler;
 
 import dev.steelaspect.containerautofill.config.Configs;
+import dev.steelaspect.containerautofill.storage.StorageRetriever;
 import dev.steelaspect.containerautofill.takeitout.ShulkerRetriever;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.ingame.HandledScreen;
@@ -122,7 +123,7 @@ public final class ContainerFillJob {
         this.ticksSinceAction++;
 
         if (this.retrievalWait != null) {
-            if (ShulkerRetriever.isWaiting()) return;
+            if (ShulkerRetriever.isWaiting() || StorageRetriever.isWaiting()) return;
             finishRetrievalWait(client);
         }
 
@@ -216,6 +217,9 @@ public final class ContainerFillJob {
                 continue;
             }
 
+            if (requestFromLinkedStorage(client, want, key, need)) {
+                return true;
+            }
             if (Configs.USE_TAKEITOUT_SOURCES.getBooleanValue() && requestFromShulker(client, want, key)) {
                 return true;
             }
@@ -300,6 +304,20 @@ public final class ContainerFillJob {
             }
         }
         return best;
+    }
+
+    private boolean requestFromLinkedStorage(MinecraftClient client, ItemStack want, ItemMatcher.StackKey key, int need) {
+        if (client.player == null) return false;
+        Predicate<ItemStack> matcher = s -> ItemStack.areItemsAndComponentsEqual(s, want);
+        if (!StorageRetriever.hasItem(client, matcher)) return false;
+        int before = ShulkerRetriever.countInInventory(client.player.getInventory(), matcher);
+        if (client.player.getInventory().getEmptySlot() < 0) {
+            this.inventoryFull = true;
+            return false;
+        }
+        if (!StorageRetriever.request(client, matcher, need, false)) return false;
+        this.retrievalWait = new RetrievalWait(key, matcher, before);
+        return true;
     }
 
     private boolean requestFromShulker(MinecraftClient client, ItemStack want, ItemMatcher.StackKey key) {

@@ -27,6 +27,12 @@ public class GuiConfigs extends GuiConfigsBase {
         this(null);
     }
 
+    /** Config screen opened on the TakeItOut tab (used by the storage menu's Settings button). */
+    public static GuiConfigs forTakeItOut(Screen parent) {
+        tab = Tab.TAKEITOUT;
+        return new GuiConfigs(parent);
+    }
+
     @Override
     public void initGui() {
         super.initGui();

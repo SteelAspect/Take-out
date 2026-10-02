@@ -9,6 +9,8 @@ import dev.steelaspect.containerautofill.Reference;
 import dev.steelaspect.containerautofill.config.Configs;
 import dev.steelaspect.containerautofill.config.GuiConfigs;
 import dev.steelaspect.containerautofill.filler.AutoFillController;
+import dev.steelaspect.containerautofill.storage.StorageActions;
+import dev.steelaspect.containerautofill.storage.StorageScreen;
 import dev.steelaspect.containerautofill.takeitout.TakeItOutFeatures;
 import fi.dy.masa.malilib.config.options.ConfigBooleanHotkeyed;
 import fi.dy.masa.malilib.config.options.ConfigHotkey;
@@ -69,6 +71,33 @@ public final class InputHandler implements IKeybindProvider, IHotkeyCallback {
         }
         if (key == Configs.AUTO_TAKE_OUT.getKeybind()) {
             TakeItOutFeatures.toggleAutoTakeOut(client);
+            return true;
+        }
+        if (key == Configs.SINGLE_ITEM_MODE.getKeybind() || key == Configs.LINKED_OUTLINES.getKeybind()) {
+            ConfigBooleanHotkeyed option = key == Configs.SINGLE_ITEM_MODE.getKeybind() ? Configs.SINGLE_ITEM_MODE : Configs.LINKED_OUTLINES;
+            option.toggleBooleanValue();
+            client.player.sendMessage(net.minecraft.text.Text.translatable(option.getBooleanValue()
+                    ? "containerautofill.message.option_on" : "containerautofill.message.option_off", option.getPrettyName()), true);
+            return true;
+        }
+        if (key == Configs.OPEN_STORAGE_MENU.getKeybind()) {
+            StorageScreen.open(client);
+            return true;
+        }
+        if (key == Configs.LINK_LOOKED_AT.getKeybind()) {
+            StorageActions.toggleLookedAt(client);
+            return true;
+        }
+        if (key == Configs.BOX_SELECT_CORNER.getKeybind()) {
+            StorageActions.boxSelectCorner(client);
+            return true;
+        }
+        if (key == Configs.MARK_DUMP_CONTAINER.getKeybind()) {
+            StorageActions.toggleDump(client);
+            return true;
+        }
+        if (key == Configs.DUMP_TO_CONTAINERS.getKeybind()) {
+            StorageActions.dumpInventory(client);
             return true;
         }
         if (key == Configs.HIGHLIGHT_CONTAINERS.getKeybind()) {

@@ -6,6 +6,7 @@
 package dev.steelaspect.containerautofill.takeitout;
 
 import dev.steelaspect.containerautofill.config.Configs;
+import dev.steelaspect.containerautofill.storage.StorageRetriever;
 import fi.dy.masa.litematica.materials.MaterialCache;
 import fi.dy.masa.litematica.util.RayTraceUtils;
 import fi.dy.masa.litematica.util.WorldUtils;
@@ -57,7 +58,7 @@ public final class TakeItOutFeatures {
         if (!Configs.AUTO_TAKE_OUT.getBooleanValue()) return;
         if (client.player == null || client.world == null || client.currentScreen != null) return;
         if (client.player.isCreative() || !client.player.getAbilities().allowModifyWorld) return;
-        if (ShulkerRetriever.isWaiting()) return;
+        if (ShulkerRetriever.isWaiting() || StorageRetriever.isWaiting()) return;
 
         WorldSchematic schematic = SchematicWorldHandler.getSchematicWorld();
         if (schematic == null) return;
@@ -88,9 +89,16 @@ public final class TakeItOutFeatures {
         Predicate<ItemStack> matcher = s -> ItemStack.areItemsAndComponentsEqual(s, required);
         if (ShulkerRetriever.countInInventory(client.player.getInventory(), matcher) > 0) return false;
         if (!isSelectedSlotPickBlockable(client)) return false;
-        if (ShulkerRetriever.isWaitingFor(required)) return true;
+        if (ShulkerRetriever.isWaitingFor(required) || StorageRetriever.isWaiting()) return true;
 
-        return ShulkerRetriever.request(client, required, matcher) == ShulkerRetriever.Outcome.REQUESTED;
+        return requestFromAnySource(client, required, matcher);
+    }
+
+    /** Shulker in the inventory first (like TakeItOut), then linked storage; the item goes to the main hand. */
+    private static boolean requestFromAnySource(MinecraftClient client, ItemStack required, Predicate<ItemStack> matcher) {
+        if (ShulkerRetriever.request(client, required, matcher) == ShulkerRetriever.Outcome.REQUESTED) return true;
+        int count = Configs.SINGLE_ITEM_MODE.getBooleanValue() ? 1 : required.getMaxCount();
+        return StorageRetriever.request(client, matcher, count, true);
     }
 
     /** Vanilla pick block on a real block (survival only, as in TakeItOut). */
@@ -104,7 +112,8 @@ public final class TakeItOutFeatures {
 
         Predicate<ItemStack> matcher = s -> ItemStack.areItemsAndComponentsEqual(s, stack);
         if (ShulkerRetriever.countInInventory(client.player.getInventory(), matcher) > 0) return;
-        ShulkerRetriever.request(client, stack, matcher);
+        if (ShulkerRetriever.isWaiting() || StorageRetriever.isWaiting()) return;
+        requestFromAnySource(client, stack, matcher);
     }
 
     private static boolean isMissingButInShulker(MinecraftClient client, WorldSchematic schematic, BlockPos pos) {
@@ -115,7 +124,7 @@ public final class TakeItOutFeatures {
 
         Predicate<ItemStack> matcher = s -> ItemStack.areItemsAndComponentsEqual(s, required);
         if (ShulkerRetriever.countInInventory(client.player.getInventory(), matcher) > 0) return false;
-        return ShulkerRetriever.find(client.player.getInventory(), matcher) != null;
+        return ShulkerRetriever.find(client.player.getInventory(), matcher) != null || StorageRetriever.hasItem(client, matcher);
     }
 
     /** True if a real block is in front of (or at) the schematic block being targeted. */

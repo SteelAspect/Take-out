@@ -19,6 +19,12 @@ import net.minecraft.util.math.Vec3d;
 import org.joml.Matrix4f;
 
 import java.util.Map;
+import java.util.Set;
+import dev.steelaspect.containerautofill.storage.StorageActions;
+import dev.steelaspect.containerautofill.storage.StorageContents;
+import dev.steelaspect.containerautofill.storage.StorageStore;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.util.Identifier;
 
 /** Draws a see-through coloured box and an outline on every highlighted container. */
 public final class HighlightRenderer implements IRenderer {
@@ -33,7 +39,9 @@ public final class HighlightRenderer implements IRenderer {
 
     @Override
     public void onRenderWorldLast(Matrix4f posMatrix, Matrix4f projMatrix) {
-        if (!Configs.ENABLE_MOD.getBooleanValue() || !Configs.HIGHLIGHT_CONTAINERS.getBooleanValue()) return;
+        if (!Configs.ENABLE_MOD.getBooleanValue()) return;
+        renderLinkedOutlines();
+        if (!Configs.HIGHLIGHT_CONTAINERS.getBooleanValue()) return;
         Map<BlockPos, ContainerStatus> statuses = ContainerHighlighter.statuses();
         if (statuses.isEmpty()) return;
 
@@ -71,6 +79,44 @@ public final class HighlightRenderer implements IRenderer {
             if (!this.loggedError) {
                 this.loggedError = true;
                 Reference.LOGGER.warn("Container highlight rendering failed", e);
+            }
+        }
+    }
+
+    /** Outlines on linked containers (dump containers in their own colour) and pulsing Look At markers. */
+    private void renderLinkedOutlines() {
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client.world == null || StorageStore.worldKey() == null) return;
+        boolean outlines = Configs.LINKED_OUTLINES.getBooleanValue();
+        Set<StorageContents.Key> lookAt = StorageActions.lookAtTargets();
+        if (!outlines && lookAt.isEmpty()) return;
+
+        Identifier dimension = client.world.getRegistryKey().getValue();
+        boolean throughWalls = Configs.LINKED_OUTLINES_THROUGH_WALLS.getBooleanValue();
+        try (RenderContext lines = new RenderContext(() -> Reference.MOD_ID + ":linked/lines", throughWalls
+                ? MaLiLibPipelines.DEBUG_LINES_MASA_SIMPLE_NO_DEPTH_NO_CULL
+                : MaLiLibPipelines.DEBUG_LINES_MASA_SIMPLE_LEQUAL_DEPTH)) {
+            BufferBuilder buffer = lines.getBuilder();
+            if (outlines) {
+                Color4f linked = Configs.LINKED_OUTLINE_COLOR.getColor();
+                Color4f dump = Configs.DUMP_OUTLINE_COLOR.getColor();
+                for (StorageStore.Entry entry : StorageStore.linkedEntries()) {
+                    if (!entry.dimension.equals(dimension.toString())) continue;
+                    RenderUtils.drawBlockBoundingBoxOutlinesBatchedLinesSimple(entry.pos(), entry.dump ? dump : linked, 0.002, LINE_WIDTH, buffer);
+                }
+            }
+            float pulse = (float) (0.55 + 0.45 * Math.sin(System.currentTimeMillis() / 150.0));
+            Color4f marker = new Color4f(1.0f, 0.2f, 1.0f, pulse);
+            for (StorageContents.Key key : lookAt) {
+                if (key.dimension().equals(dimension)) {
+                    RenderUtils.drawBlockBoundingBoxOutlinesBatchedLinesSimple(key.pos(), marker, 0.03, 4.0f, buffer);
+                }
+            }
+            draw(lines, buffer);
+        } catch (Exception e) {
+            if (!this.loggedError) {
+                this.loggedError = true;
+                Reference.LOGGER.warn("Linked container outline rendering failed", e);
             }
         }
     }

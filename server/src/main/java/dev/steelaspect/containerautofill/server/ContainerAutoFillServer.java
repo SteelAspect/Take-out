@@ -5,6 +5,7 @@
  */
 package dev.steelaspect.containerautofill.server;
 
+import dev.steelaspect.containerautofill.network.StorageServerHandler;
 import dev.steelaspect.containerautofill.takeitout.GetStackPayload;
 import dev.steelaspect.containerautofill.takeitout.ShulkerStackServerHandler;
 import net.fabricmc.api.DedicatedServerModInitializer;
@@ -22,6 +23,7 @@ public class ContainerAutoFillServer implements DedicatedServerModInitializer {
         PayloadTypeRegistry.playC2S().register(GetStackPayload.ID, GetStackPayload.CODEC);
         ServerPlayNetworking.registerGlobalReceiver(GetStackPayload.ID, (payload, context) ->
                 ShulkerStackServerHandler.handle(context.player(), payload.slot(), payload.shulker()));
-        LOGGER.info("Shulker retrieval channel {} ready", GetStackPayload.ID.id());
+        StorageServerHandler.register();
+        LOGGER.info("Shulker retrieval channel {} and linked storage channels ready", GetStackPayload.ID.id());
     }
 }

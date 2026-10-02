@@ -17,6 +17,7 @@ sourceSets {
             // Share the protocol and server handler with the client mod so both stay identical.
             srcDir rootProject.file('src/main/java')
             include 'dev/steelaspect/containerautofill/server/**'
+            include 'dev/steelaspect/containerautofill/network/**'
             include 'dev/steelaspect/containerautofill/takeitout/GetStackPayload.java'
             include 'dev/steelaspect/containerautofill/takeitout/ShulkerStackServerHandler.java'
             include 'dev/steelaspect/containerautofill/takeitout/ShulkerUtil.java'

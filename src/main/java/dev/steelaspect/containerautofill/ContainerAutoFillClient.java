@@ -24,6 +24,12 @@ import fi.dy.masa.malilib.util.data.ModInfo;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import dev.steelaspect.containerautofill.network.StoragePayloads;
+import dev.steelaspect.containerautofill.storage.StorageActions;
+import dev.steelaspect.containerautofill.storage.StorageContents;
+import dev.steelaspect.containerautofill.storage.StorageRetriever;
+import dev.steelaspect.containerautofill.storage.StorageStore;
 import net.minecraft.client.MinecraftClient;
 
 public class ContainerAutoFillClient implements ClientModInitializer {
@@ -38,10 +44,16 @@ public class ContainerAutoFillClient implements ClientModInitializer {
         });
 
         ClientTickEvents.END_CLIENT_TICK.register(ContainerAutoFillClient::onEndTick);
+        ClientPlayNetworking.registerGlobalReceiver(StoragePayloads.Contents.ID, (payload, context) -> StorageContents.onContents(payload));
+        ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> StorageStore.load(client));
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
             AutoFillController.reset();
             ShulkerRetriever.reset();
             ContainerHighlighter.reset();
+            StorageActions.reset();
+            StorageRetriever.reset();
+            StorageContents.clear();
+            StorageStore.unload();
         });
     }
 
@@ -55,6 +67,8 @@ public class ContainerAutoFillClient implements ClientModInitializer {
         AutoFillController.tick(client);
         TakeItOutFeatures.tick(client);
         RealContainerCache.tick(client);
+        StorageRetriever.tick(client);
+        StorageActions.tick(client);
         ContainerHighlighter.tick(client);
     }
 }
