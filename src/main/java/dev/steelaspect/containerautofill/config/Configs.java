@@ -46,12 +46,16 @@ public class Configs implements IConfigHandler {
             ENABLE_MOD,
             CLICK_DELAY,
             CLEAR_WRONG_ITEMS,
-            USE_TAKEITOUT_SOURCES,
             MATCH_SHULKER_BOXES_BY_CONTENT,
             CLOSE_AFTER_LOOK_FILL,
-            SHULKER_PICK_BLOCK,
-            AUTO_TAKE_OUT,
             DEBUG_LOGGING
+    );
+
+    /** TakeItOut behaviour: pulling items out of shulker boxes in the inventory. */
+    public static final ImmutableList<IConfigBase> TAKEITOUT = ImmutableList.of(
+            AUTO_TAKE_OUT,
+            SHULKER_PICK_BLOCK,
+            USE_TAKEITOUT_SOURCES
     );
 
     // --- Highlight ---
@@ -116,6 +120,8 @@ public class Configs implements IConfigHandler {
             if (element != null && element.isJsonObject()) {
                 JsonObject root = element.getAsJsonObject();
                 ConfigUtils.readConfigBase(root, "Generic", GENERIC);
+                ConfigUtils.readConfigBase(root, "Generic", TAKEITOUT); // files saved before the TakeItOut tab existed
+                ConfigUtils.readConfigBase(root, "TakeItOut", TAKEITOUT);
                 ConfigUtils.readConfigBase(root, "Highlight", HIGHLIGHT);
                 ConfigUtils.readConfigBase(root, "Hotkeys", HOTKEYS);
             }
@@ -133,6 +139,7 @@ public class Configs implements IConfigHandler {
         }
         JsonObject root = new JsonObject();
         ConfigUtils.writeConfigBase(root, "Generic", GENERIC);
+        ConfigUtils.writeConfigBase(root, "TakeItOut", TAKEITOUT);
         ConfigUtils.writeConfigBase(root, "Highlight", HIGHLIGHT);
         ConfigUtils.writeConfigBase(root, "Hotkeys", HOTKEYS);
         JsonUtils.writeJsonToFile(root, dir.resolve(CONFIG_FILE_NAME));

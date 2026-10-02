@@ -95,11 +95,11 @@ None of these defaults clash with vanilla, Litematica or MaLiLib defaults.
 | Enable Mod | on | Turns every feature on or off. |
 | Click Delay (ticks) | 1 | Ticks between automated clicks. 1 means one click per tick. Raise it if a server complains about fast clicking. |
 | Clear Wrong Items | **off** | Shift-click unexpected items out of the container before filling. |
-| Use TakeItOut Sources | on | Use shulker retrieval while auto-filling. |
+| Use TakeItOut Sources (TakeItOut tab) | on | Use shulker retrieval while auto-filling. |
 | Match Shulker Boxes By Content | off | A shulker box in a container slot counts as correct if its contents match (from LCF). |
 | Close After Look Fill | on | Close the container after *Fill Looked At Container*. |
-| Pick Block From Shulkers | on | TakeItOut's pick-block behaviour. |
-| Auto Take Out | off | TakeItOut's toggle mode (key R). |
+| Pick Block From Shulkers (TakeItOut tab) | on | TakeItOut's pick-block behaviour. |
+| Auto Take Out (TakeItOut tab) | off | TakeItOut's toggle mode (key R). |
 | Debug Logging | off | Logs every click and retrieval to `latest.log`. |
 
 **Highlight tab**

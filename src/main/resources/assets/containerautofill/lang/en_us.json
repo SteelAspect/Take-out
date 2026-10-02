@@ -93,5 +93,6 @@
   "containerautofill.message.takeitout_unsupported": "This server doesn't accept shulker item requests (TakeItOut is not installed there). Only loose inventory items will be used.",
   "containerautofill.gui.button.config_gui.highlight": "Highlight",
   "containerautofill.message.highlight_on": "Container highlight ON",
-  "containerautofill.message.highlight_off": "Container highlight OFF"
+  "containerautofill.message.highlight_off": "Container highlight OFF",
+  "containerautofill.gui.button.config_gui.takeitout": "TakeItOut"
 }

@@ -29,3 +29,4 @@
 [2026-10-02 03:40] MISTAKE | 'git checkout -- src/gametest' reverted uncommitted test additions; re-applied them from the same scripts and re-ran (53/53). | - | -
 [2026-10-02 03:40] COMPLETE | README.md, TESTING.md updated; build clean (0 warnings). | README.md, TESTING.md | Commit and push
 [2026-10-02 03:51] PREVIEW | Captured config menu screenshots (Generic/Highlight/Hotkeys) and sent to user. Found options showing internal names; fixed lang labels. Screenshot test's window resize broke later fill tests in that run; removed resize and moved it after the main suite. Full suite not re-run yet. | lang/en_us.json, src/gametest/** | Re-run suite on request
+[2026-10-02 03:52] UI | User chose a separate TakeItOut tab: Auto Take Out (R), Pick Block From Shulkers, Use TakeItOut Sources moved from Generic; old config files still load. Screenshots of all 4 tabs sent. | config/Configs.java, config/GuiConfigs.java, lang, README.md | -
