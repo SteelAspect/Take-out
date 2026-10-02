@@ -60,8 +60,16 @@ Placed schematic containers within *Highlight Range* get a see-through coloured 
 - A container whose block differs from the schematic (e.g. a barrel instead of a chest) isn't highlighted.
 - Toggle the highlight with *Highlight Containers*, which has an optional hotkey. Colours, range, see-through mode and hiding green/grey boxes are all configurable.
 
-### 3. Fill looked-at container (from Litematica-Container-Filler)
-Look at a schematic container and press **V**. The mod opens the container, fills it the same way as above, and closes it again (*Close After Look Fill*).
+### 3. Fill looked-at container (`V`): instant
+Look at a schematic container and press **V**. With **Instant Fill** on (the default), the server fills every slot at once and the container is **never opened**. It takes items in this order:
+
+1. your inventory,
+2. shulker boxes in your inventory,
+3. your linked containers (any distance, while their chunk is loaded).
+
+Double chests, crafter slot locks and *Clear Wrong Items* are handled the same way as the click-based fill. The action bar shows "Filled X slots, Y items missing" and chat lists what's missing.
+
+Instant Fill needs singleplayer/LAN, or a Fabric server with `containerautofill-server`. Without either (or with Instant Fill turned off), `V` falls back to the original behaviour from Litematica-Container-Filler: it opens the container, fills it with clicks and closes it again (*Close After Look Fill*).
 
 ### 4. TakeItOut behaviour (shulker retrieval)
 - **Pick block from shulkers.** If you pick a block with vanilla middle-click, Litematica's schematic pick-block or easy place, and you don't carry it loose, the mod pulls it from a shulker box in your inventory into your hand.
@@ -89,7 +97,7 @@ Link containers once, then take items from them, or put items into them, **from 
 - **Dump:** mark containers as dump targets (*Mark Dump Container*), then *Dump to Containers* moves your main inventory (not the hotbar) into them.
 - **Outlines:** linked containers are outlined in green and dump containers in orange. You can toggle this and change the colours.
 - **Pulling from storage:** auto-fill, pick block and Auto Take Out pull missing items from linked containers too. *Single-item Mode* (`B`) makes pick block take 1 item.
-- Links are saved per world/server in `config/containerautofill/storage/`, with up to 500 containers per group.
+- Links are saved per world/server in `config/containerautofill/storage/`. There's no limit on how many containers you link.
 
 ## Hotkeys
 
@@ -111,6 +119,7 @@ None of these defaults clash with vanilla, Litematica or MaLiLib defaults.
 | Option | Default | Description |
 |---|---|---|
 | Enable Mod | on | Turns every feature on or off. |
+| Instant Fill | on | `V` fills the container server-side in one go without opening it. |
 | Click Delay (ticks) | 1 | Ticks between automated clicks. 1 means one click per tick. Raise it if a server complains about fast clicking. |
 | Clear Wrong Items | **off** | Shift-click unexpected items out of the container before filling. |
 | Use TakeItOut Sources (TakeItOut tab) | on | Use shulker retrieval while auto-filling. |
