@@ -36,7 +36,7 @@ public final class StorageServerHandler {
     public static final int MAX_QUERY_POSITIONS = 128;
     private static final int CONTAINERS_PER_REPLY = 32;
     /** Container reads per player per second. */
-    private static final int QUERY_BUDGET_PER_SECOND = 1024;
+    private static final int QUERY_BUDGET_PER_SECOND = 4096;
 
     private static final Map<UUID, long[]> QUERY_BUDGETS = new ConcurrentHashMap<>();
 
@@ -53,9 +53,10 @@ public final class StorageServerHandler {
         ServerPlayNetworking.registerGlobalReceiver(StoragePayloads.Take.ID, (p, ctx) -> take(ctx.player(), p));
         ServerPlayNetworking.registerGlobalReceiver(StoragePayloads.Deposit.ID, (p, ctx) -> deposit(ctx.player(), p));
         ServerPlayNetworking.registerGlobalReceiver(StoragePayloads.Query.ID, (p, ctx) -> query(ctx.player(), p));
+        FillServerHandler.register();
     }
 
-    private static Inventory inventoryAt(ServerPlayerEntity player, Identifier dimension, BlockPos pos, boolean announceLock) {
+    static Inventory inventoryAt(ServerPlayerEntity player, Identifier dimension, BlockPos pos, boolean announceLock) {
         if (player == null || player.isSpectator() || !player.isAlive()) return null;
         ServerWorld world = player.getEntityWorld().getServer().getWorld(RegistryKey.of(RegistryKeys.WORLD, dimension));
         if (world == null || !world.isChunkLoaded(pos.getX() >> 4, pos.getZ() >> 4)) return null;

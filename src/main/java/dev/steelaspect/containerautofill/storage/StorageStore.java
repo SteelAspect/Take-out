@@ -25,10 +25,10 @@ import java.util.Objects;
 
 /**
  * Linked containers, organised in named groups, saved per world/server under
- * {@code config/containerautofill/storage/}. Only the active group is used as a source.
+ * {@code config/containerautofill/storage/}. Only the active group is used as a source. There is no limit on
+ * how many containers a group holds.
  */
 public final class StorageStore {
-    public static final int MAX_PER_GROUP = 500;
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
     /** A container in a group. {@code linked=false} keeps it listed but stops using it as a source. */
@@ -194,7 +194,7 @@ public final class StorageStore {
             if (imported == null || imported.containers == null) return null;
             Group group = createGroup(imported.name);
             for (Entry entry : imported.containers) {
-                if (entry != null && entry.dimension != null && group.containers.size() < MAX_PER_GROUP) group.containers.add(entry);
+                if (entry != null && entry.dimension != null) group.containers.add(entry);
             }
             save();
             return group;
@@ -212,7 +212,7 @@ public final class StorageStore {
         return null;
     }
 
-    /** Adds the container to the active group (or re-links it). Returns false when the group is full. */
+    /** Adds the container to the active group (or re-links it). */
     public static boolean link(Identifier dimension, BlockPos pos) {
         Entry existing = find(dimension, pos);
         if (existing != null) {
@@ -220,9 +220,7 @@ public final class StorageStore {
             save();
             return true;
         }
-        Group group = activeGroup();
-        if (group.containers.size() >= MAX_PER_GROUP) return false;
-        group.containers.add(new Entry(dimension, pos));
+        activeGroup().containers.add(new Entry(dimension, pos));
         save();
         return true;
     }

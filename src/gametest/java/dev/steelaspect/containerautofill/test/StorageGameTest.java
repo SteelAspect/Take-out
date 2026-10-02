@@ -6,6 +6,16 @@
 package dev.steelaspect.containerautofill.test;
 
 import dev.steelaspect.containerautofill.config.Configs;
+import dev.steelaspect.containerautofill.filler.InstantFill;
+import fi.dy.masa.litematica.data.DataManager;
+import fi.dy.masa.litematica.schematic.LitematicaSchematic;
+import fi.dy.masa.litematica.schematic.placement.SchematicPlacement;
+import fi.dy.masa.litematica.selection.AreaSelection;
+import fi.dy.masa.litematica.selection.Box;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.ChestBlock;
+import net.minecraft.block.enums.ChestType;
+import net.minecraft.util.math.Direction;
 import dev.steelaspect.containerautofill.storage.StorageActions;
 import dev.steelaspect.containerautofill.storage.StorageContents;
 import dev.steelaspect.containerautofill.storage.StorageScreen;
@@ -47,7 +57,8 @@ public class StorageGameTest implements FabricClientGameTest {
 
     private final List<String> failures = new ArrayList<>();
     private int passes;
-    private BlockPos chestA, chestB, dumpChest, farChest, goldBlock;
+    private BlockPos chestA, chestB, dumpChest, farChest, goldBlock, fillLeft, fillRight, fillHopper;
+    private LitematicaSchematic schematic;
     private Identifier overworld;
 
     @Override
@@ -70,6 +81,7 @@ public class StorageGameTest implements FabricClientGameTest {
             testRemoteTake(context, world);
             testPickBlockFromStorage(context, world);
             testDump(context, world);
+            testInstantFill(context, world);
             testLookAtAndGroups(context);
         }
 
@@ -110,6 +122,9 @@ public class StorageGameTest implements FabricClientGameTest {
         dumpChest = base.add(4, 0, 0);
         goldBlock = base.add(0, 0, 5);
         farChest = base.add(160, 0, 0);
+        fillLeft = base.add(0, 0, 9);
+        fillRight = base.add(1, 0, 9);
+        fillHopper = base.add(3, 0, 9);
         world.getServer().runCommand(String.format(Locale.ROOT, "forceload add %d %d", farChest.getX(), farChest.getZ()));
         world.getServer().runOnServer(server -> {
             ServerWorld w = server.getOverworld();
@@ -121,7 +136,26 @@ public class StorageGameTest implements FabricClientGameTest {
             fill(w, chestB, Map.of(0, stack(Items.GOLD_INGOT, 20), 5, stack(Items.GOLD_BLOCK, 5)));
             fill(w, farChest, Map.of(0, stack(Items.EMERALD, 16)));
             player(server).getInventory().clear();
+
+            // Schematic for instant fill: a double chest and a hopper, saved full, then emptied.
+            BlockState north = Blocks.CHEST.getDefaultState().with(ChestBlock.FACING, Direction.NORTH);
+            w.setBlockState(fillLeft, north.with(ChestBlock.CHEST_TYPE, ChestType.LEFT));
+            w.setBlockState(fillRight, north.with(ChestBlock.CHEST_TYPE, ChestType.RIGHT));
+            w.setBlockState(fillHopper, Blocks.HOPPER.getDefaultState());
+            ItemStack fillGem = stack(Items.DIAMOND, 1);
+            fillGem.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Gem"));
+            fill(w, fillRight, Map.of(0, stack(Items.STONE, 64), 1, stack(Items.IRON_INGOT, 30)));
+            fill(w, fillLeft, Map.of(0, stack(Items.EMERALD, 5), 3, stack(Items.GOLD_INGOT, 4), 7, fillGem));
+            fill(w, fillHopper, Map.of(0, stack(Items.GLASS, 3), 2, stack(Items.TNT, 2)));
+            AreaSelection area = new AreaSelection();
+            area.addSubRegionBox(new Box(fillLeft, fillHopper, "fill"), false);
+            area.setExplicitOrigin(fillLeft);
+            schematic = LitematicaSchematic.createFromWorld(w, area, new LitematicaSchematic.SchematicSaveInfo(false, true), "steelaspect", msg -> {});
+            for (BlockPos p : List.of(fillLeft, fillRight, fillHopper)) ((Inventory) w.getBlockEntity(p)).clear();
+            fill(w, fillHopper, Map.of(0, stack(Items.DIRT, 1)));
         });
+        context.runOnClient(client -> DataManager.getSchematicPlacementManager()
+                .addSchematicPlacement(SchematicPlacement.createFor(schematic, fillLeft, "instant-fill-test", true, true), false));
         world.getServer().runCommand("gamemode survival @a");
         overworld = context.computeOnClient(client -> client.world.getRegistryKey().getValue());
         context.waitTicks(10);
@@ -273,6 +307,102 @@ public class StorageGameTest implements FabricClientGameTest {
                 && containerCount(world, dumpChest, Items.DIRT) == 10, "cobble=" + containerCount(world, dumpChest, Items.COBBLESTONE)
                 + " dirt=" + containerCount(world, dumpChest, Items.DIRT));
         check("S9 hotbar is not dumped", serverCount(world, s -> s.isOf(Items.TORCH)) == 5, "torches moved");
+    }
+
+    private Map<Integer, ItemStack> contents(TestSingleplayerContext world, BlockPos pos) {
+        return world.getServer().computeOnServer(server -> {
+            Inventory inv = (Inventory) server.getOverworld().getBlockEntity(pos);
+            Map<Integer, ItemStack> m = new java.util.HashMap<>();
+            for (int i = 0; i < inv.size(); i++) if (!inv.getStack(i).isEmpty()) m.put(i, inv.getStack(i).copy());
+            return m;
+        });
+    }
+
+    private static boolean matches(Map<Integer, ItemStack> actual, Map<Integer, ItemStack> expected) {
+        if (actual.size() != expected.size()) return false;
+        for (Map.Entry<Integer, ItemStack> e : expected.entrySet()) {
+            ItemStack a = actual.get(e.getKey());
+            if (a == null || !ItemStack.areEqual(a, e.getValue())) return false;
+        }
+        return true;
+    }
+
+    private void testInstantFill(ClientGameTestContext context, TestSingleplayerContext world) {
+        check("I0 server supports instant fill", context.computeOnClient(client -> InstantFill.isSupported()), "fill channel missing");
+        world.getServer().runOnServer(server -> {
+            PlayerInventory inv = player(server).getInventory();
+            inv.clear();
+            inv.setStack(9, stack(Items.STONE, 64));
+            ItemStack box = new ItemStack(Items.PURPLE_SHULKER_BOX);
+            net.minecraft.util.collection.DefaultedList<ItemStack> inner = net.minecraft.util.collection.DefaultedList.ofSize(27, ItemStack.EMPTY);
+            inner.set(3, stack(Items.IRON_INGOT, 40));
+            box.set(DataComponentTypes.CONTAINER, net.minecraft.component.type.ContainerComponent.fromStacks(inner));
+            inv.setStack(10, box);
+            inv.setStack(11, stack(Items.GLASS, 16));
+        });
+        context.runOnClient(client -> {
+            Configs.INSTANT_FILL.setBooleanValue(true);
+            Configs.CLEAR_WRONG_ITEMS.setBooleanValue(false);
+            Configs.FILL_LOOKED_AT_CONTAINER.setValueFromString("V");
+            InputEventHandler.getKeybindManager().updateUsedKeys();
+            StorageActions.refreshAll();
+        });
+        context.waitTicks(40);
+
+        lookAt(context, world, fillLeft);
+        var before = dev.steelaspect.containerautofill.filler.AutoFillController.getLastResult();
+        boolean[] screenOpened = {false};
+        context.getInput().pressKey(GLFW.GLFW_KEY_V);
+        try {
+            context.waitFor(client -> {
+                if (client.currentScreen != null) screenOpened[0] = true;
+                return dev.steelaspect.containerautofill.filler.AutoFillController.getLastResult() != before;
+            }, 100);
+        } catch (Throwable t) {
+            check("I1 instant fill answered", false, "no result");
+            return;
+        }
+        int ticks = 0;
+        var result = dev.steelaspect.containerautofill.filler.AutoFillController.getLastResult();
+        check("I1 no container screen was opened", !screenOpened[0], "a screen opened");
+        ItemStack gem = stack(Items.DIAMOND, 1);
+        gem.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Gem"));
+        check("I2 double chest right half: loose stone + iron from a shulker in the inventory",
+                matches(contents(world, fillRight), Map.of(0, stack(Items.STONE, 64), 1, stack(Items.IRON_INGOT, 30))),
+                "right=" + contents(world, fillRight));
+        check("I3 double chest left half: items pulled from linked containers (incl. 160 blocks away, named item)",
+                matches(contents(world, fillLeft), Map.of(0, stack(Items.EMERALD, 5), 3, stack(Items.GOLD_INGOT, 4), 7, gem)),
+                "left=" + contents(world, fillLeft));
+        check("I4 nothing missing for the double chest", result.missingItems() == 0 && result.filledSlots() == 5, "result " + result);
+        check("I5 items really moved (shulker 40->10 iron, far chest 6->1 emerald)",
+                containerCount(world, farChest, Items.EMERALD) == 1 && serverCount(world, s -> {
+                    var c = s.get(DataComponentTypes.CONTAINER);
+                    return c != null && c.stream().anyMatch(i -> i.isOf(Items.IRON_INGOT) && i.getCount() == 10);
+                }) == 1, "far emerald=" + containerCount(world, farChest, Items.EMERALD));
+
+        lookAt(context, world, fillHopper);
+        var beforeHopper = dev.steelaspect.containerautofill.filler.AutoFillController.getLastResult();
+        context.getInput().pressKey(GLFW.GLFW_KEY_V);
+        try {
+            context.waitFor(client -> dev.steelaspect.containerautofill.filler.AutoFillController.getLastResult() != beforeHopper, 100);
+        } catch (Throwable ignored) {
+        }
+        var hopperResult = dev.steelaspect.containerautofill.filler.AutoFillController.getLastResult();
+        check("I6 wrong item kept (clear wrong off) and missing TNT reported",
+                matches(contents(world, fillHopper), Map.of(0, stack(Items.DIRT, 1)))
+                        && hopperResult.wrongSlots() == 1 && hopperResult.missingItems() == 5,
+                "hopper=" + contents(world, fillHopper) + " result=" + hopperResult);
+        context.runOnClient(client -> Configs.CLEAR_WRONG_ITEMS.setBooleanValue(true));
+        var beforeClear = dev.steelaspect.containerautofill.filler.AutoFillController.getLastResult();
+        context.getInput().pressKey(GLFW.GLFW_KEY_V);
+        try {
+            context.waitFor(client -> dev.steelaspect.containerautofill.filler.AutoFillController.getLastResult() != beforeClear, 100);
+        } catch (Throwable ignored) {
+        }
+        check("I7 clear wrong items on: dirt removed, glass filled",
+                matches(contents(world, fillHopper), Map.of(0, stack(Items.GLASS, 3))) && serverCount(world, s -> s.isOf(Items.DIRT)) == 1,
+                "hopper=" + contents(world, fillHopper));
+        context.runOnClient(client -> Configs.CLEAR_WRONG_ITEMS.setBooleanValue(false));
     }
 
     private void testLookAtAndGroups(ClientGameTestContext context) {

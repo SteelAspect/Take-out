@@ -27,6 +27,8 @@ public final class StorageContents {
     }
 
     private static final Map<Key, Snapshot> CACHE = new ConcurrentHashMap<>();
+    /** Query batches waiting to be sent, one per tick, so thousands of linked containers don't flood the server. */
+    private static final java.util.Deque<StoragePayloads.Query> OUTBOX = new java.util.ArrayDeque<>();
 
     private StorageContents() {
     }
@@ -45,6 +47,18 @@ public final class StorageContents {
 
     public static void clear() {
         CACHE.clear();
+        OUTBOX.clear();
+    }
+
+    /** True while a refresh is still being sent. */
+    public static boolean isRefreshing() {
+        return !OUTBOX.isEmpty();
+    }
+
+    public static void tick() {
+        if (!OUTBOX.isEmpty() && isSupported()) {
+            ClientPlayNetworking.send(OUTBOX.poll());
+        }
     }
 
     public static void onContents(StoragePayloads.Contents payload) {
@@ -67,14 +81,14 @@ public final class StorageContents {
         byDimension.forEach((dimension, positions) -> {
             for (int i = 0; i < positions.size(); i += StoragePayloadsLimits.QUERY_BATCH) {
                 List<BlockPos> batch = List.copyOf(positions.subList(i, Math.min(positions.size(), i + StoragePayloadsLimits.QUERY_BATCH)));
-                ClientPlayNetworking.send(new StoragePayloads.Query(dimension, batch));
+                OUTBOX.add(new StoragePayloads.Query(dimension, batch));
             }
         });
     }
 
     public static void requestOne(Identifier dimension, BlockPos pos) {
         if (!isSupported()) return;
-        ClientPlayNetworking.send(new StoragePayloads.Query(dimension, List.of(pos)));
+        OUTBOX.addFirst(new StoragePayloads.Query(dimension, List.of(pos)));
     }
 
     private static final class StoragePayloadsLimits {

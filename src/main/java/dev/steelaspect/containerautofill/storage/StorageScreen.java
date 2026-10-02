@@ -153,7 +153,7 @@ public class StorageScreen extends Screen {
                 }
             }
             case CONTAINERS -> context.drawTextWithShadow(this.textRenderer, Text.translatable("containerautofill.storage.world",
-                    StorageStore.worldKey(), StorageStore.activeGroup().name, StorageStore.linkedCount(), StorageStore.MAX_PER_GROUP), left, 46, ACCENT);
+                    StorageStore.worldKey(), StorageStore.activeGroup().name, StorageStore.linkedCount()), left, 46, ACCENT);
             case GROUPS -> context.drawTextWithShadow(this.textRenderer, Text.translatable("containerautofill.storage.groups"), left, 46, ACCENT);
         }
     }

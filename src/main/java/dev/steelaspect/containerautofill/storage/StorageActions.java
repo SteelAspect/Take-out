@@ -54,6 +54,7 @@ public final class StorageActions {
     public static void tick(MinecraftClient client) {
         ticks++;
         if (client.player == null || StorageStore.worldKey() == null) return;
+        StorageContents.tick();
 
         if (!QUEUE.isEmpty() && ticks - lastAction >= Configs.CLICK_DELAY.getIntegerValue()) {
             ClientPlayNetworking.send(QUEUE.poll());
@@ -79,6 +80,7 @@ public final class StorageActions {
 
     public static void refreshAll() {
         lastRefresh = ticks;
+        if (StorageContents.isRefreshing()) return;
         StorageContents.request(StorageStore.linkedEntries());
     }
 
@@ -107,17 +109,14 @@ public final class StorageActions {
                 StorageStore.Entry e = StorageStore.find(dim, half);
                 if (e != null) StorageStore.remove(e);
             }
-            actionBar(client, Text.translatable("containerautofill.message.storage_unlinked", StorageStore.linkedCount(), StorageStore.MAX_PER_GROUP));
+            actionBar(client, Text.translatable("containerautofill.message.storage_unlinked", StorageStore.linkedCount()));
             return;
         }
         for (BlockPos half : halves) {
-            if (!StorageStore.link(dim, half)) {
-                actionBar(client, Text.translatable("containerautofill.message.storage_group_full", StorageStore.MAX_PER_GROUP));
-                return;
-            }
+            StorageStore.link(dim, half);
             StorageContents.requestOne(dim, half);
         }
-        actionBar(client, Text.translatable("containerautofill.message.storage_linked", StorageStore.linkedCount(), StorageStore.MAX_PER_GROUP));
+        actionBar(client, Text.translatable("containerautofill.message.storage_linked", StorageStore.linkedCount()));
     }
 
     /** Hotkey: first press sets one corner, second press links every container in the box. */
@@ -136,22 +135,17 @@ public final class StorageActions {
         }
         Identifier dim = dimension(client);
         int added = 0;
-        boolean full = false;
         for (BlockPos p : BlockPos.iterate(a, pos)) {
             if (!client.world.isChunkLoaded(p.getX() >> 4, p.getZ() >> 4)) continue;
             BlockEntity blockEntity = client.world.getBlockEntity(p);
             if (!(blockEntity instanceof Inventory)) continue;
             StorageStore.Entry existing = StorageStore.find(dim, p);
             if (existing != null && existing.linked) continue;
-            if (!StorageStore.link(dim, p.toImmutable())) {
-                full = true;
-                break;
-            }
+            StorageStore.link(dim, p.toImmutable());
             added++;
         }
         refreshAll();
-        actionBar(client, Text.translatable(full ? "containerautofill.message.storage_group_full" : "containerautofill.message.storage_box_done",
-                full ? StorageStore.MAX_PER_GROUP : added, StorageStore.activeGroup().name));
+        actionBar(client, Text.translatable("containerautofill.message.storage_box_done", added, StorageStore.activeGroup().name));
     }
 
     /** Hotkey: mark/unmark the looked-at container as a dump target (links it if needed). */
@@ -162,10 +156,7 @@ public final class StorageActions {
             return;
         }
         Identifier dim = dimension(client);
-        if (StorageStore.find(dim, pos) == null && !StorageStore.link(dim, pos)) {
-            actionBar(client, Text.translatable("containerautofill.message.storage_group_full", StorageStore.MAX_PER_GROUP));
-            return;
-        }
+        if (StorageStore.find(dim, pos) == null) StorageStore.link(dim, pos);
         StorageStore.Entry entry = StorageStore.find(dim, pos);
         entry.dump = !entry.dump;
         StorageStore.save();

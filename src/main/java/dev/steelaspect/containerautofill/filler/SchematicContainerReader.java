@@ -40,7 +40,9 @@ import net.minecraft.registry.RegistryWrapper;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -87,29 +89,52 @@ public final class SchematicContainerReader {
      * @return expected stacks keyed by container index (0..53 for double chests, right half first like vanilla)
      */
     public static Result read(World world, BlockPos pos, RegistryWrapper.WrapperLookup registries) {
-        BlockPos[] halves = getRealContainerHalves(world, pos);
-        Map<Integer, ItemStack> combined = new HashMap<>();
-
-        Set<Integer> disabled = new HashSet<>();
-
-        for (int half = 0; half < halves.length; half++) {
-            BlockPos halfPos = halves[half];
-            Single single = readSingle(halfPos, registries);
-            if (single == null) return Result.of(Status.NOT_IN_PLACEMENT);
-            if (!single.state().hasBlockEntity()) return Result.of(Status.NOT_A_CONTAINER);
-            if (!isCompatible(world, halfPos, single.state())) {
-                return new Result(Status.BLOCK_MISMATCH, Collections.emptyMap(), Collections.emptySet(), single.state().getBlock());
-            }
-
-            int offset = half * CHEST_HALF_SIZE;
-            single.items().forEach((slot, stack) -> {
-                if (halves.length > 1 && slot >= CHEST_HALF_SIZE) return;
-                combined.put(slot + offset, stack);
-            });
-            disabled.addAll(single.disabledSlots());
+        Halves halves = readHalves(world, pos, registries);
+        if (halves.status() != Status.OK) {
+            return new Result(halves.status(), Collections.emptyMap(), Collections.emptySet(), halves.expectedBlock());
         }
 
+        Map<Integer, ItemStack> combined = new HashMap<>();
+        Set<Integer> disabled = new HashSet<>();
+        for (int half = 0; half < halves.parts().size(); half++) {
+            int offset = half * CHEST_HALF_SIZE;
+            halves.parts().get(half).single().items().forEach((slot, stack) -> combined.put(slot + offset, stack));
+            disabled.addAll(halves.parts().get(half).single().disabledSlots());
+        }
         return new Result(Status.OK, combined, disabled, world.getBlockState(pos).getBlock());
+    }
+
+    /** One block of a container (a single container, or one double chest half) with its own expected contents. */
+    public record Part(BlockPos pos, Single single) {
+    }
+
+    public record Halves(Status status, List<Part> parts, Block expectedBlock) {
+    }
+
+    /**
+     * Expected contents per block. Double chest halves are kept separate (each holds its own 27 slots),
+     * which is what the server-side instant fill works with.
+     */
+    public static Halves readHalves(World world, BlockPos pos, RegistryWrapper.WrapperLookup registries) {
+        BlockPos[] halves = getRealContainerHalves(world, pos);
+        List<Part> parts = new ArrayList<>();
+        for (BlockPos halfPos : halves) {
+            Single single = readSingle(halfPos, registries);
+            if (single == null) return new Halves(Status.NOT_IN_PLACEMENT, List.of(), null);
+            if (!single.state().hasBlockEntity()) return new Halves(Status.NOT_A_CONTAINER, List.of(), null);
+            if (!isCompatible(world, halfPos, single.state())) {
+                return new Halves(Status.BLOCK_MISMATCH, List.of(), single.state().getBlock());
+            }
+            if (halves.length > 1) {
+                Map<Integer, ItemStack> own = new HashMap<>();
+                single.items().forEach((slot, stack) -> {
+                    if (slot < CHEST_HALF_SIZE) own.put(slot, stack);
+                });
+                single = new Single(single.state(), own, single.disabledSlots());
+            }
+            parts.add(new Part(halfPos, single));
+        }
+        return new Halves(Status.OK, parts, world.getBlockState(pos).getBlock());
     }
 
     /**

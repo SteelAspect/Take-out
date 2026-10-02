@@ -50,6 +50,10 @@ public final class AutoFillController {
         return lastResult;
     }
 
+    static void setLastResult(FillResult result) {
+        lastResult = result;
+    }
+
     /** Translation key of the most recent action-bar message from the controller. */
     public static String getLastMessageKey() {
         return lastMessageKey;
@@ -82,7 +86,7 @@ public final class AutoFillController {
     public static void fillLookedAtContainer(MinecraftClient client) {
         if (client.player == null || client.world == null || client.interactionManager == null) return;
         if (client.currentScreen != null) return;
-        if (job != null || pendingOpenPos != null) {
+        if (job != null || pendingOpenPos != null || InstantFill.isRunning()) {
             actionBar(client, Text.translatable("containerautofill.message.already_running"));
             return;
         }
@@ -99,6 +103,12 @@ public final class AutoFillController {
         }
         SchematicContainerReader.Result result = SchematicContainerReader.read(client.world, pos, client.world.getRegistryManager());
         if (!reportReadProblem(client, result)) return;
+
+        // Server-side instant fill: nothing is opened, every slot is filled at once.
+        if (Configs.INSTANT_FILL.getBooleanValue() && InstantFill.isSupported()) {
+            InstantFill.start(client, pos, SchematicContainerReader.readHalves(client.world, pos, client.world.getRegistryManager()));
+            return;
+        }
 
         if (client.player.isSneaking()) {
             actionBar(client, Text.translatable("containerautofill.message.stop_sneaking"));

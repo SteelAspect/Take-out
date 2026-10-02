@@ -35,6 +35,7 @@ public class Configs implements IConfigHandler {
     public static final ConfigBoolean ENABLE_MOD = new ConfigBoolean("enableMod", true).apply(PREFIX);
     public static final ConfigInteger CLICK_DELAY = new ConfigInteger("clickDelay", 1, 1, 40).apply(PREFIX);
     public static final ConfigBoolean CLEAR_WRONG_ITEMS = new ConfigBoolean("clearWrongItems", false).apply(PREFIX);
+    public static final ConfigBoolean INSTANT_FILL = new ConfigBoolean("instantFill", true).apply(PREFIX);
     public static final ConfigBoolean USE_TAKEITOUT_SOURCES = new ConfigBoolean("useTakeItOutSources", true).apply(PREFIX);
     public static final ConfigBoolean MATCH_SHULKER_BOXES_BY_CONTENT = new ConfigBoolean("matchShulkerBoxesByContent", false).apply(PREFIX);
     public static final ConfigBoolean CLOSE_AFTER_LOOK_FILL = new ConfigBoolean("closeAfterLookFill", true).apply(PREFIX);
@@ -53,6 +54,7 @@ public class Configs implements IConfigHandler {
 
     public static final ImmutableList<IConfigBase> GENERIC = ImmutableList.of(
             ENABLE_MOD,
+            INSTANT_FILL,
             CLICK_DELAY,
             CLEAR_WRONG_ITEMS,
             MATCH_SHULKER_BOXES_BY_CONTENT,
