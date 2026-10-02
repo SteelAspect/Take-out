@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "containerautofill",
   "version": "${version}",
-  "name": "Container Auto Fill",
+  "name": "Cytra Container",
   "description": "Fills containers to match your Litematica schematic, and pulls missing items out of shulker boxes in your inventory (TakeItOut-compatible).",
   "authors": ["steelaspect"],
   "contact": {

@@ -1,5 +1,5 @@
 /*
- * Container Auto Fill
+ * Cytra Container
  * Copyright (C) 2026 steelaspect
  * SPDX-License-Identifier: LGPL-3.0-only
  */
@@ -46,7 +46,7 @@ public class ClientRequirements implements ClientModInitializer {
         }
         met = problems.isEmpty();
         if (!met) {
-            throw new IllegalStateException("Container Auto Fill needs Litematica and MaLiLib on the client: "
+            throw new IllegalStateException("Cytra Container needs Litematica and MaLiLib on the client: "
                     + String.join("; ", problems) + ". (A dedicated server doesn't need them.)");
         }
     }

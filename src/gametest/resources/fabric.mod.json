@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "containerautofill-test",
   "version": "1.0.0",
-  "name": "Container Auto Fill (client game tests)",
+  "name": "Cytra Container (client game tests)",
   "authors": [
     "steelaspect"
   ],

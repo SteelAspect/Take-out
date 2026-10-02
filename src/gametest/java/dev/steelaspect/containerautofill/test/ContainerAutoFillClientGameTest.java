@@ -1,5 +1,5 @@
 /*
- * Container Auto Fill
+ * Cytra Container
  * Copyright (C) 2026 steelaspect
  * SPDX-License-Identifier: LGPL-3.0-only
  */
@@ -110,7 +110,7 @@ public class ContainerAutoFillClientGameTest implements FabricClientGameTest {
 
         testServerWithoutHandler(context);
 
-        LOG.info("==== Container Auto Fill game test summary: {} passed, {} failed ====", passes.size(), failures.size());
+        LOG.info("==== Cytra Container game test summary: {} passed, {} failed ====", passes.size(), failures.size());
         passes.forEach(p -> LOG.info("PASS {}", p));
         failures.forEach(f -> LOG.error("FAIL {}", f));
         if (!failures.isEmpty()) {

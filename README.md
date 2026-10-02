@@ -1,6 +1,6 @@
-# Container Auto Fill
+# Cytra Container
 
-A client-side Fabric mod for **Minecraft Java 1.21.11** by **steelaspect**.
+A Fabric mod for **Minecraft Java 1.21.11** by **steelaspect**. Version **1.1.1**, one jar (`cytra-container-1.1.1.jar`) for the client and, optionally, the server.
 
 It brings together the behaviour of two mods, without needing either of them installed:
 
@@ -18,7 +18,7 @@ It also adds a new **auto-fill hotkey** and a **container highlight** that shows
 | Litematica | ≥ 0.26.16 for 1.21.11 (client only) |
 | MaLiLib | ≥ 0.27.20 for 1.21.11 (client only) |
 
-**One jar for client and server.** On a **Fabric dedicated server**, put the same `containerautofill-<version>.jar` in the server's `mods` folder (with Fabric API) to enable the server-side features: shulker retrieval, linked storage, instant/area fill, server-read highlight status and Restock. The server doesn't need Litematica or MaLiLib; the client does. It isn't needed on the server in singleplayer or LAN. Keep the client and server on the same version.
+**One jar for client and server.** On a **Fabric dedicated server**, put the same `cytra-container-<version>.jar` in the server's `mods` folder (with Fabric API) to enable the server-side features: shulker retrieval, linked storage, instant/area fill, server-read highlight status and Restock. The server doesn't need Litematica or MaLiLib; the client does. It isn't needed on the server in singleplayer or LAN. Keep the client and server on the same version.
 
 TakeItOut and Litematica-Container-Filler are **not** needed. They are declared as `breaks` because they register the same network channel and the same default keys. If either is installed, Fabric stops at launch with a clear message.
 
@@ -185,7 +185,7 @@ None of these defaults clash with vanilla, Litematica or MaLiLib defaults.
 ## Building
 
 ```bash
-./gradlew build                 # build/libs/containerautofill-<version>.jar (client and server)
+./gradlew build                 # build/libs/cytra-container-<version>.jar (client and server)
 ./gradlew runClientGameTest     # automated in-game tests (needs a display, or xvfb-run)
 ```
 You need Java 21. The build uses the Gradle 9.8 wrapper and Fabric Loom 1.17.

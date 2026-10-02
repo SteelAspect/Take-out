@@ -1,12 +1,12 @@
-# TESTING — Container Auto Fill (MC 1.21.11)
+# TESTING — Cytra Container (MC 1.21.11)
 
 ## A. Automated checks (run on every change)
 
 | # | Check | How | Expected |
 |---|---|---|---|
 | A1 | Build | `./gradlew clean build --warning-mode all` | `BUILD SUCCESSFUL`, 0 javac warnings, 0 Gradle deprecations, no missing-dependency messages |
-| A2 | No nested jars | `unzip -l build/libs/containerautofill-*.jar \| grep META-INF/jars` | no output |
-| A3 | Declared dependencies | `unzip -p build/libs/containerautofill-*.jar fabric.mod.json` | `depends` = fabricloader, minecraft, fabric-api, litematica, malilib; `breaks` = takeitout, litematica_container_filler |
+| A2 | No nested jars | `unzip -l build/libs/cytra-container-*.jar \| grep META-INF/jars` | no output |
+| A3 | Declared dependencies | `unzip -p build/libs/cytra-container-*.jar fabric.mod.json` | `depends` = fabricloader, minecraft, fabric-api; `suggests` = litematica, malilib (client-only, checked at client start); `breaks` = takeitout, litematica_container_filler; `environment` = `*` |
 | A4 | No original packages | `unzip -l … \| grep -E 'maxbel\|mimicenzymes\|litematicafiller'` | no output |
 | A5 | Mixin targets remapped | `javap -v` on `ClientPlayerInteractionManagerMixin.class` | targets intermediary names (`method_2896` = `interactBlock`) |
 | A7 | In-game suite | `xvfb-run -a ./gradlew runClientGameTest` (or with a display) | `summary: N passed, 0 failed` in the log |
@@ -100,8 +100,8 @@
 
 | # | Case | Steps | Expected |
 |---|---|---|---|
-| D1 | Only allowed mods | Launch with Fabric API, Litematica, MaLiLib, this mod | Game reaches the title screen; `latest.log` shows `containerautofill 1.0.0+1.21.11` loaded |
-| D2 | Litematica missing on the client | Remove Litematica from `mods/` | The game stops at startup with *Container Auto Fill needs Litematica and MaLiLib on the client: litematica >=0.26.16 is missing* (the same jar on a dedicated server doesn't need them) |
+| D1 | Only allowed mods | Launch with Fabric API, Litematica, MaLiLib, this mod | Game reaches the title screen; `latest.log` shows `containerautofill 1.1.1` (Cytra Container) loaded |
+| D2 | Litematica missing on the client | Remove Litematica from `mods/` | The game stops at startup with *Cytra Container needs Litematica and MaLiLib on the client: litematica >=0.26.16 is missing* (the same jar on a dedicated server doesn't need them) |
 | D3 | Original mods installed alongside | Add TakeItOut or Litematica-Container-Filler | Fabric refuses to start with a clear "breaks" message naming the conflicting mod |
 
 ## E. Results log
@@ -124,3 +124,4 @@ Record each run here (date, version, environment, pass/fail per case).
 | 2026-10-02 | 1.0.0+1.21.11 | Cloud container, client gametests under Xvfb | Full suite 53/53 + 40/40 (hotbar refill R1–R5 added; crafter known issue logged) |
 | 2026-10-02 | 1.0.0+1.21.11 | Cloud container, client gametests under Xvfb | Full suite 53/53 + 46/46 (Restock K1–K6 added; offhand restocked in 3 ticks with the rest of the mod off) |
 | 2026-10-02 | 1.0.0+1.21.11 | Single jar | A8 pass: `runServer` reaches Done with only containerautofill + Fabric API (Litematica/MaLiLib skipped as client-only). D2 pass: client without Litematica stops with "Container Auto Fill needs Litematica and MaLiLib on the client: litematica [>=0.26.16] is missing". Full suite 53/53 + 50/50 (totem K7–K10; popped totem replaced in 1 tick) |
+| 2026-10-02 | 1.1.1 (Cytra Container) | Cloud container, client gametests under Xvfb | Renamed build `cytra-container-1.1.1.jar`: full suite 53/53 + 50/50, config title "Cytra Container - Configs" |

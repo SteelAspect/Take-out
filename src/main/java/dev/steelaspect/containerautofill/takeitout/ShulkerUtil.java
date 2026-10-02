@@ -1,5 +1,5 @@
 /*
- * Container Auto Fill
+ * Cytra Container
  * Copyright (C) 2026 steelaspect
  * SPDX-License-Identifier: LGPL-3.0-only
  */
