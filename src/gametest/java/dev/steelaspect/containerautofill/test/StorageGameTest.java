@@ -81,6 +81,7 @@ public class StorageGameTest implements FabricClientGameTest {
             testRemoteTake(context, world);
             testPickBlockFromStorage(context, world);
             testPullSpeed(context, world);
+            testHotbarRefill(context, world);
             testDump(context, world);
             testInstantFill(context, world);
             testAreaFillAndServerStatus(context, world);
@@ -404,7 +405,7 @@ public class StorageGameTest implements FabricClientGameTest {
                 check("P3 easy place with single-item mode places all 3 blocks", placeTicks >= 0, "not all placed");
                 check("P4 buffer 1 takes exactly 1 item per block", taken == 3 && left == 0, "taken=" + taken + " left=" + left);
             } else {
-                check("P5 buffer 3 places all 3 blocks, at most 3 items left over, none lost",
+                check("P5 buffer 3 places all 3 blocks, at most one top-up left over, none lost",
                         placeTicks >= 0 && left <= buffer && taken == 3 + left, "ticks=" + placeTicks + " taken=" + taken + " left=" + left);
             }
         }
@@ -419,6 +420,94 @@ public class StorageGameTest implements FabricClientGameTest {
                 if ("speed-row".equals(placement.getName())) manager.removeSchematicPlacement(placement);
             }
         });
+    }
+
+    /** R1-R5: hotbar refill after the last item in the hand is placed. */
+    private void testHotbarRefill(ClientGameTestContext context, TestSingleplayerContext world) {
+        BlockPos target = chestA.add(-14, 0, 6);
+        world.getServer().runOnServer(server -> server.getOverworld().setBlockState(target, Blocks.OBSIDIAN.getDefaultState()));
+
+        refillCase(context, world, target, "R1 refill from the rest of the inventory (10 cobblestone from slot 20)",
+                Map.of(0, stack(Items.COBBLESTONE, 1), 20, stack(Items.COBBLESTONE, 10)), true,
+                c -> c.player.getInventory().getStack(0).isOf(Items.COBBLESTONE) && c.player.getInventory().getStack(0).getCount() == 10
+                        && c.player.getInventory().getStack(20).isEmpty());
+
+        ItemStack shulker = new ItemStack(Items.LIME_SHULKER_BOX);
+        net.minecraft.util.collection.DefaultedList<ItemStack> inner = net.minecraft.util.collection.DefaultedList.ofSize(27, ItemStack.EMPTY);
+        inner.set(4, stack(Items.DIRT, 30));
+        shulker.set(DataComponentTypes.CONTAINER, net.minecraft.component.type.ContainerComponent.fromStacks(inner));
+        refillCase(context, world, target, "R2 refill from a shulker box in the inventory (30 dirt)",
+                Map.of(0, stack(Items.DIRT, 1), 10, shulker), true,
+                c -> c.player.getInventory().getStack(0).isOf(Items.DIRT) && c.player.getInventory().getStack(0).getCount() == 30);
+
+        refillCase(context, world, target, "R3 refill from linked storage (stone)",
+                Map.of(0, stack(Items.STONE, 1)), true,
+                c -> c.player.getInventory().getStack(0).isOf(Items.STONE) && c.player.getInventory().getStack(0).getCount() > 1);
+
+        context.runOnClient(client -> Configs.HOTBAR_REFILL.setBooleanValue(false));
+        refillCase(context, world, target, "R4 turned off: slot stays empty",
+                Map.of(0, stack(Items.COBBLESTONE, 1), 20, stack(Items.COBBLESTONE, 10)), false,
+                c -> c.player.getInventory().getStack(0).isEmpty() && c.player.getInventory().getStack(20).getCount() == 10);
+        context.runOnClient(client -> Configs.HOTBAR_REFILL.setBooleanValue(true));
+
+        // R5: dropping the last item (Q) is not using it up, so nothing is refilled.
+        setPlayerInventory(world, Map.of(0, stack(Items.OAK_PLANKS, 1), 20, stack(Items.OAK_PLANKS, 10)));
+        context.waitFor(client -> client.player.getInventory().getStack(0).isOf(Items.OAK_PLANKS)
+                && client.player.getInventory().getStack(20).isOf(Items.OAK_PLANKS), 40);
+        context.runOnClient(client -> client.player.getInventory().setSelectedSlot(0));
+        context.getInput().pressKey(options -> options.dropKey);
+        context.waitTicks(10);
+        boolean dropped = context.computeOnClient(client -> client.player.getInventory().getStack(0).isEmpty()
+                && client.player.getInventory().getStack(20).isOf(Items.OAK_PLANKS) && client.player.getInventory().getStack(20).getCount() == 10);
+        check("R5 dropping the last item does not refill", dropped, "slot 0 refilled after a drop: " + context.computeOnClient(client ->
+                client.player.getInventory().getStack(0) + " / slot20 " + client.player.getInventory().getStack(20)));
+        world.getServer().runCommand("kill @e[type=item]");
+    }
+
+    private void setPlayerInventory(TestSingleplayerContext world, Map<Integer, ItemStack> items) {
+        world.getServer().runOnServer(server -> {
+            PlayerInventory inv = player(server).getInventory();
+            inv.clear();
+            items.forEach((slot, st) -> inv.setStack(slot, st.copy()));
+        });
+    }
+
+    private void refillCase(ClientGameTestContext context, TestSingleplayerContext world, BlockPos target, String name,
+                            Map<Integer, ItemStack> inventory, boolean expectRefill, Predicate<MinecraftClient> done) {
+        world.getServer().runOnServer(server -> {
+            for (Direction d : Direction.values()) server.getOverworld().setBlockState(target.offset(d), Blocks.AIR.getDefaultState());
+            server.getOverworld().setBlockState(target.down(), Blocks.STONE_BRICKS.getDefaultState());
+        });
+        setPlayerInventory(world, inventory);
+        lookAt(context, world, target);
+        try {
+            context.waitFor(client -> !client.player.getInventory().getStack(0).isEmpty(), 40);
+        } catch (Throwable t) {
+            String server = world.getServer().computeOnServer(sv -> player(sv).getInventory().getStack(0) + " sel=" + player(sv).getInventory().getSelectedSlot());
+            String client = context.computeOnClient(c -> c.player.getInventory().getStack(0) + " sel=" + c.player.getInventory().getSelectedSlot()
+                    + " screen=" + c.currentScreen);
+            check(name, false, "inventory not set up: server " + server + ", client " + client + " full server inv " + world.getServer()
+                    .computeOnServer(sv -> { StringBuilder b = new StringBuilder(); PlayerInventory inv = player(sv).getInventory();
+                        for (int i = 0; i < inv.size(); i++) if (!inv.getStack(i).isEmpty()) b.append(i).append('=').append(inv.getStack(i)).append(' ');
+                        return b.toString(); }));
+            return;
+        }
+        context.getInput().pressKey(options -> options.useKey);
+        boolean ok;
+        if (expectRefill) {
+            try {
+                context.waitFor(done, 40);
+                ok = true;
+            } catch (Throwable t) {
+                ok = false;
+            }
+        } else {
+            context.waitTicks(15);
+            ok = context.computeOnClient(done::test);
+        }
+        String state = context.computeOnClient(client -> client.player.getInventory().getStack(0) + " / slot20 " + client.player.getInventory().getStack(20));
+        check(name, ok, "hotbar 0 = " + state);
+        context.waitTicks(5); // let the server finish the refill before the next case resets the inventory
     }
 
     private void testDump(ClientGameTestContext context, TestSingleplayerContext world) {

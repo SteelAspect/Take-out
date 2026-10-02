@@ -73,8 +73,9 @@ public final class InputHandler implements IKeybindProvider, IHotkeyCallback {
             TakeItOutFeatures.toggleAutoTakeOut(client);
             return true;
         }
-        if (key == Configs.SINGLE_ITEM_MODE.getKeybind() || key == Configs.LINKED_OUTLINES.getKeybind()) {
-            ConfigBooleanHotkeyed option = key == Configs.SINGLE_ITEM_MODE.getKeybind() ? Configs.SINGLE_ITEM_MODE : Configs.LINKED_OUTLINES;
+        if (key == Configs.SINGLE_ITEM_MODE.getKeybind() || key == Configs.LINKED_OUTLINES.getKeybind() || key == Configs.HOTBAR_REFILL.getKeybind()) {
+            ConfigBooleanHotkeyed option = key == Configs.SINGLE_ITEM_MODE.getKeybind() ? Configs.SINGLE_ITEM_MODE
+                    : key == Configs.LINKED_OUTLINES.getKeybind() ? Configs.LINKED_OUTLINES : Configs.HOTBAR_REFILL;
             option.toggleBooleanValue();
             client.player.sendMessage(net.minecraft.text.Text.translatable(option.getBooleanValue()
                     ? "containerautofill.message.option_on" : "containerautofill.message.option_off", option.getPrettyName()), true);

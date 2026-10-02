@@ -32,7 +32,8 @@ public final class StoragePayloads {
      * {@code requestId} is echoed in the {@link Taken} answer (0 when the client doesn't wait for it).
      */
     public record Take(int requestId, Identifier dimension, BlockPos pos, int slot, int count, boolean toHand) implements CustomPayload {
-        public static final Id<Take> ID = new Id<>(id("take"));
+        // "take_v2": the request id was added, so a server with the older format simply doesn't offer this channel.
+        public static final Id<Take> ID = new Id<>(id("take_v2"));
         public static final PacketCodec<RegistryByteBuf, Take> CODEC = PacketCodec.tuple(
                 PacketCodecs.VAR_INT, Take::requestId,
                 Identifier.PACKET_CODEC, Take::dimension,

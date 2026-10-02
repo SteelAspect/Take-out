@@ -11,6 +11,7 @@ import dev.steelaspect.containerautofill.filler.AutoFillController;
 import dev.steelaspect.containerautofill.filler.ContainerTracker;
 import dev.steelaspect.containerautofill.input.InputHandler;
 import dev.steelaspect.containerautofill.takeitout.ShulkerRetriever;
+import dev.steelaspect.containerautofill.takeitout.HotbarRefill;
 import dev.steelaspect.containerautofill.takeitout.TakeItOutFeatures;
 import fi.dy.masa.malilib.config.ConfigManager;
 import fi.dy.masa.malilib.event.InitializationHandler;
@@ -48,8 +49,12 @@ public class ContainerAutoFillClient implements ClientModInitializer {
         ClientTickEvents.END_CLIENT_TICK.register(ContainerAutoFillClient::onEndTick);
         ClientPlayNetworking.registerGlobalReceiver(StoragePayloads.Contents.ID, (payload, context) -> StorageContents.onContents(payload));
         ClientPlayNetworking.registerGlobalReceiver(StoragePayloads.Taken.ID, (payload, context) -> {
-            if (StorageRetriever.onTaken(context.client(), payload)) TakeItOutFeatures.onStorageMiss(context.client());
-            else TakeItOutFeatures.onInventoryPacket(context.client());
+            switch (StorageRetriever.onTaken(context.client(), payload)) {
+                case ARRIVED -> TakeItOutFeatures.onStorageArrived(context.client());
+                case MISSED -> TakeItOutFeatures.onStorageMiss(context.client());
+                case NOT_OURS -> {
+                }
+            }
         });
         ClientPlayNetworking.registerGlobalReceiver(FillPayloads.Result.ID, (payload, context) -> InstantFill.onResult(context.client(), payload));
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> StorageStore.load(client));
@@ -61,6 +66,7 @@ public class ContainerAutoFillClient implements ClientModInitializer {
             InstantFill.reset();
             StorageRetriever.reset();
             TakeItOutFeatures.reset();
+            HotbarRefill.reset();
             StorageContents.clear();
             StorageStore.unload();
         });
@@ -76,6 +82,7 @@ public class ContainerAutoFillClient implements ClientModInitializer {
         AutoFillController.tick(client);
         InstantFill.tick(client);
         TakeItOutFeatures.tick(client);
+        HotbarRefill.tick(client);
         RealContainerCache.tick(client);
         StorageRetriever.tick(client);
         StorageActions.tick(client);

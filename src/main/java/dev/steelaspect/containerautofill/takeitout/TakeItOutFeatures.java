@@ -147,8 +147,12 @@ public final class TakeItOutFeatures {
      * waiting for this item, places it right away instead of on the next use tick.
      */
     public static void onInventoryPacket(MinecraftClient client) {
-        boolean arrived = ShulkerRetriever.onInventoryChanged(client) | StorageRetriever.onInventoryChanged(client);
-        if (arrived) retryEasyPlace(client, false);
+        if (ShulkerRetriever.onInventoryChanged(client)) retryEasyPlace(client, false);
+    }
+
+    /** The server confirmed a linked-storage pull; the item is already in the inventory. */
+    public static void onStorageArrived(MinecraftClient client) {
+        retryEasyPlace(client, false);
     }
 
     /** The server found a linked slot empty: easy place tries again now, which picks the next source. */

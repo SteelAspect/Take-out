@@ -19,13 +19,15 @@ import java.util.function.Predicate;
 
 /**
  * Pulls a missing item out of linked storage for auto-fill, pick block and auto take-out. Requests for
- * different items can be in flight together; each resolves as soon as its item lands in the inventory,
- * when the server reports a miss ({@link StoragePayloads.Taken}), or after a ping-based timeout.
+ * different items can be in flight together. Each resolves when the server answers it
+ * ({@link StoragePayloads.Taken}, sent after the inventory sync, so the item is already there), or after a
+ * ping-based timeout. Inventory counts aren't used: a late server correction can briefly show one item
+ * more than the client's own prediction and would look like an arrival.
  */
 public final class StorageRetriever {
     private static final int MAX_IN_FLIGHT = 4;
 
-    private record Pending(int id, Predicate<ItemStack> matcher, ItemStack item, int countBefore,
+    private record Pending(int id, ItemStack item,
                            Identifier dimension, BlockPos pos, int slot, long deadline) {
     }
 
@@ -59,37 +61,21 @@ public final class StorageRetriever {
             Configs.debug("Linked storage request {} for {} timed out", p.id(), p.item());
             return true;
         });
-        onInventoryChanged(client);
     }
 
-    /** Clears requests whose item has arrived. Called every tick and whenever an inventory packet lands. */
-    public static boolean onInventoryChanged(MinecraftClient client) {
-        if (client.player == null || PENDING.isEmpty()) return false;
-        return PENDING.removeIf(p -> {
-            int now = ShulkerRetriever.countInInventory(client.player.getInventory(), p.matcher());
-            if (now <= p.countBefore()) return false;
-            Configs.debug("Linked storage request {} for {} arrived ({} -> {})", p.id(), p.item(), p.countBefore(), now);
-            return true;
-        });
-    }
+    public enum Answer { NOT_OURS, ARRIVED, MISSED }
 
-    /**
-     * Server answer to a take: a miss frees the request at once and refreshes the stale container.
-     * Returns true if it was a miss for one of this retriever's requests.
-     */
-    public static boolean onTaken(MinecraftClient client, StoragePayloads.Taken taken) {
-        onInventoryChanged(client);
-        if (taken.requestId() == 0) return false;
+    /** Server answer to a take. A miss also drops the stale slot from the cache and re-reads the container. */
+    public static Answer onTaken(MinecraftClient client, StoragePayloads.Taken taken) {
+        if (taken.requestId() == 0) return Answer.NOT_OURS;
         Configs.debug("Server answered request {}: moved {}", taken.requestId(), taken.moved());
-        boolean removed = PENDING.removeIf(p -> p.id() == taken.requestId());
-        if (removed && taken.moved() <= 0) {
-            Configs.debug("Linked container {} slot {} was empty, refreshing it", taken.pos(), taken.slot());
-            StorageContents.Snapshot snapshot = StorageContents.get(taken.dimension(), taken.pos());
-            if (snapshot != null) snapshot.items().remove(taken.slot());
-            StorageContents.requestOne(taken.dimension(), taken.pos());
-            return true;
-        }
-        return false;
+        if (!PENDING.removeIf(p -> p.id() == taken.requestId())) return Answer.NOT_OURS;
+        if (taken.moved() > 0) return Answer.ARRIVED;
+        Configs.debug("Linked container {} slot {} was empty, refreshing it", taken.pos(), taken.slot());
+        StorageContents.Snapshot snapshot = StorageContents.get(taken.dimension(), taken.pos());
+        if (snapshot != null) snapshot.items().remove(taken.slot());
+        StorageContents.requestOne(taken.dimension(), taken.pos());
+        return Answer.MISSED;
     }
 
     public static void reset() {
@@ -115,8 +101,7 @@ public final class StorageRetriever {
         int amount = Math.min(count, source.stack().getCount());
         int id = nextId;
         nextId = nextId == Integer.MAX_VALUE ? 1 : nextId + 1;
-        PENDING.add(new Pending(id, matcher, source.stack().copyWithCount(1), ShulkerRetriever.countInInventory(client.player.getInventory(), matcher),
-                source.entry().dimensionId(), source.entry().pos(), source.slot(), ticks + ShulkerRetriever.timeoutTicks(client)));
+        PENDING.add(new Pending(id, source.stack().copyWithCount(1), source.entry().dimensionId(), source.entry().pos(), source.slot(), ticks + ShulkerRetriever.timeoutTicks(client)));
         StorageActions.takeNow(id, source, amount, toHand);
         Configs.debug("Request {} (tick {}): {}x {} from linked container {} slot {}", id, ticks, amount, source.stack().getItem(), source.entry().pos(), source.slot());
         return true;

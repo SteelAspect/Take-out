@@ -76,7 +76,9 @@
 | P1 | Single-item pull speed | Single-item Mode on; pull 1 stone into an empty hand 10 times | All 10 arrive, ≤ 3 ticks each on average (logged as `SPEED P1`) |
 | P2 | Stale storage cache | The cache says a slot has an item the chest doesn't have; pick it | The request is freed within 5 ticks (not a 3 s wait) and the chest is re-read |
 | P3–P4 | Easy place, single-item mode, buffer 1 | Easy place on, hold right-click at a row of 3 schematic stone blocks, stone only in a linked chest | All 3 placed (time logged as `SPEED P3`); exactly 3 stone taken, none left over |
-| P5 | Same, Single-item Buffer 3 | As P3 with the buffer at 3 | All 3 placed; at most 3 spare stone, nothing lost |
+| P5 | Same, Single-item Buffer 3 | As P3 with the buffer at 3 | All 3 placed; spare stone at most one top-up (3), nothing lost |
+| R1–R3 | Hotbar refill | Place your last cobblestone / dirt / stone with more in the inventory / only in a carried shulker / only in a linked chest | The slot is refilled (10 cobblestone from the inventory, 30 dirt from the shulker, stone from storage) |
+| R4–R5 | Hotbar refill off / drop | Same with Hotbar Refill off; drop the last plank with Q | Slot stays empty, nothing moved |
 | S9 | Dump | Dump key with cobblestone/dirt in main inventory, torches in hotbar | Main inventory moved into the dump chest, hotbar kept |
 | S10–S12 | Look At, groups | Look At iron; new group; switch back; share + import | Marked; group empty then restored; import copies all entries |
 
@@ -112,3 +114,4 @@ Record each run here (date, version, environment, pass/fail per case).
 | – | – | Not testable here | C12 (needs a separate Fabric server + client connection), D3 (needs the original mods' jars) |
 | 2026-10-02 | 1.0.0+1.21.11 | Cloud container, client gametests under Xvfb | Full suite 53/53 + 34/34 (crafter known issue logged). Speed: single-item pull 1.1 ticks avg (was 1.5); easy place single-item, 3 blocks: 4 ticks with exactly 3 items taken (was 69 ticks and 4 taken) |
 | 2026-10-02 | 1.0.0+1.21.11 | Cloud container, client gametests under Xvfb | Full suite 53/53 + 35/35. Single-item Buffer: buffer 1 places 3 blocks in 5 ticks (3 taken), buffer 3 in 3 ticks (3 taken, none spare) |
+| 2026-10-02 | 1.0.0+1.21.11 | Cloud container, client gametests under Xvfb | Full suite 53/53 + 40/40 (hotbar refill R1–R5 added; crafter known issue logged) |

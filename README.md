@@ -18,7 +18,7 @@ It also adds a new **auto-fill hotkey** and a **container highlight** that shows
 | Litematica | ≥ 0.26.16 for 1.21.11 |
 | MaLiLib | ≥ 0.27.20 for 1.21.11 |
 
-For pulling items out of shulker boxes on a **Fabric dedicated server**, also put `containerautofill-server-<version>.jar` (from `build/libs`) in the server's `mods` folder. It needs only Fabric API. It isn't needed in singleplayer or LAN.
+For pulling items out of shulker boxes on a **Fabric dedicated server**, also put `containerautofill-server-<version>.jar` (from `build/libs`) in the server's `mods` folder. It needs only Fabric API. It isn't needed in singleplayer or LAN. Keep the client and server jars on the same version: with an older server jar, linked storage reports that the server doesn't support it.
 
 TakeItOut and Litematica-Container-Filler are **not** needed. They are declared as `breaks` because they register the same network channel and the same default keys. If either is installed, Fabric stops at launch with a clear message.
 
@@ -102,6 +102,7 @@ Link containers once, then take items from them, or put items into them, **from 
 - **Outlines:** linked containers are outlined in green and dump containers in orange. You can toggle this and change the colours.
 - **Pulling from storage:** auto-fill, pick block and Auto Take Out pull missing items from linked containers too. *Single-item Mode* (`B`) makes pick block and Auto Take Out take a few items instead of a full stack: *Single-item Buffer* (default 3) sets how many. While you hold easy place, the next few are pulled before you run out, so placing doesn't wait for the server. You may end up with up to that many spare items. Set it to 1 for strictly one item per pull (slower on servers with high ping).
 - **Speed:** pulled items are used the moment they arrive. With easy place, the block is placed as soon as the item reaches your hand, without waiting for the next click or tick. The server sends the item straight away and says if a slot turned out to be empty, so the next container is tried at once instead of after a 3 second wait. Pulls for different items can run at the same time. It also fixes a bug where, in single-item mode, the server sometimes didn't tell the client a new item had arrived, so an extra item was pulled and left in the inventory. On a server, single-item mode still needs one round trip per block, so it's limited by your ping.
+- **Hotbar Refill** (on by default, TakeItOut tab, optional toggle key): when placing a block or using an item (pearls, snowballs...) uses up the last one in your hand, the slot is refilled with the same item. It looks in the rest of your inventory first, then shulker boxes you carry, then linked containers. Dropping an item doesn't trigger it, and it's off in creative and while Litematica's easy place is on (easy place picks its own items). Tools that break aren't refilled.
 - Links are saved per world/server in `config/containerautofill/storage/`. There's no limit on how many containers you link.
 
 ## Hotkeys
@@ -135,6 +136,7 @@ None of these defaults clash with vanilla, Litematica or MaLiLib defaults.
 | Close After Look Fill | on | Close the container after *Fill Looked At Container*. |
 | Pick Block From Shulkers (TakeItOut tab) | on | TakeItOut's pick-block behaviour. |
 | Auto Take Out (TakeItOut tab) | off | TakeItOut's toggle mode (key R). |
+| Hotbar Refill (TakeItOut tab) | on | Refill the hand's hotbar slot when its last item is placed or used. |
 | Single-item Buffer (TakeItOut tab) | 3 | In Single-item Mode, how many items each pull from linked storage takes; easy place tops up before you run out. 1 = strictly one item. |
 | Debug Logging | off | Logs every click and retrieval to `latest.log`. |
 
