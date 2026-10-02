@@ -27,10 +27,14 @@ public final class StoragePayloads {
         return Identifier.of("containerautofill", path);
     }
 
-    /** Move up to {@code count} items from a container slot into the player's inventory (or main hand). */
-    public record Take(Identifier dimension, BlockPos pos, int slot, int count, boolean toHand) implements CustomPayload {
+    /**
+     * Move up to {@code count} items from a container slot into the player's inventory (or main hand).
+     * {@code requestId} is echoed in the {@link Taken} answer (0 when the client doesn't wait for it).
+     */
+    public record Take(int requestId, Identifier dimension, BlockPos pos, int slot, int count, boolean toHand) implements CustomPayload {
         public static final Id<Take> ID = new Id<>(id("take"));
         public static final PacketCodec<RegistryByteBuf, Take> CODEC = PacketCodec.tuple(
+                PacketCodecs.VAR_INT, Take::requestId,
                 Identifier.PACKET_CODEC, Take::dimension,
                 BlockPos.PACKET_CODEC, Take::pos,
                 PacketCodecs.VAR_INT, Take::slot,
@@ -48,9 +52,10 @@ public final class StoragePayloads {
      * Answer to {@link Take}, sent after the player's inventory has been synced: how many items were moved
      * (0 if the slot was empty or the container couldn't be reached), so the client never waits on a miss.
      */
-    public record Taken(Identifier dimension, BlockPos pos, int slot, int moved) implements CustomPayload {
+    public record Taken(int requestId, Identifier dimension, BlockPos pos, int slot, int moved) implements CustomPayload {
         public static final Id<Taken> ID = new Id<>(id("taken"));
         public static final PacketCodec<RegistryByteBuf, Taken> CODEC = PacketCodec.tuple(
+                PacketCodecs.VAR_INT, Taken::requestId,
                 Identifier.PACKET_CODEC, Taken::dimension,
                 BlockPos.PACKET_CODEC, Taken::pos,
                 PacketCodecs.VAR_INT, Taken::slot,

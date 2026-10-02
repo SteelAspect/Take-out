@@ -25,12 +25,13 @@ import java.util.function.Predicate;
 public final class StorageRetriever {
     private static final int MAX_IN_FLIGHT = 4;
 
-    private record Pending(Predicate<ItemStack> matcher, ItemStack item, int countBefore,
+    private record Pending(int id, Predicate<ItemStack> matcher, ItemStack item, int countBefore,
                            Identifier dimension, BlockPos pos, int slot, long deadline) {
     }
 
     private static final List<Pending> PENDING = new ArrayList<>();
     private static long ticks;
+    private static int nextId = 1;
 
     private StorageRetriever() {
     }
@@ -53,14 +54,23 @@ public final class StorageRetriever {
             PENDING.clear();
             return;
         }
-        PENDING.removeIf(p -> ticks > p.deadline());
+        PENDING.removeIf(p -> {
+            if (ticks <= p.deadline()) return false;
+            Configs.debug("Linked storage request {} for {} timed out", p.id(), p.item());
+            return true;
+        });
         onInventoryChanged(client);
     }
 
     /** Clears requests whose item has arrived. Called every tick and whenever an inventory packet lands. */
     public static boolean onInventoryChanged(MinecraftClient client) {
         if (client.player == null || PENDING.isEmpty()) return false;
-        return PENDING.removeIf(p -> ShulkerRetriever.countInInventory(client.player.getInventory(), p.matcher()) > p.countBefore());
+        return PENDING.removeIf(p -> {
+            int now = ShulkerRetriever.countInInventory(client.player.getInventory(), p.matcher());
+            if (now <= p.countBefore()) return false;
+            Configs.debug("Linked storage request {} for {} arrived ({} -> {})", p.id(), p.item(), p.countBefore(), now);
+            return true;
+        });
     }
 
     /**
@@ -69,7 +79,9 @@ public final class StorageRetriever {
      */
     public static boolean onTaken(MinecraftClient client, StoragePayloads.Taken taken) {
         onInventoryChanged(client);
-        boolean removed = PENDING.removeIf(p -> p.pos().equals(taken.pos()) && p.slot() == taken.slot() && p.dimension().equals(taken.dimension()));
+        if (taken.requestId() == 0) return false;
+        Configs.debug("Server answered request {}: moved {}", taken.requestId(), taken.moved());
+        boolean removed = PENDING.removeIf(p -> p.id() == taken.requestId());
         if (removed && taken.moved() <= 0) {
             Configs.debug("Linked container {} slot {} was empty, refreshing it", taken.pos(), taken.slot());
             StorageContents.Snapshot snapshot = StorageContents.get(taken.dimension(), taken.pos());
@@ -101,10 +113,12 @@ public final class StorageRetriever {
         if (PENDING.size() >= MAX_IN_FLIGHT) return true;
 
         int amount = Math.min(count, source.stack().getCount());
-        PENDING.add(new Pending(matcher, source.stack().copyWithCount(1), ShulkerRetriever.countInInventory(client.player.getInventory(), matcher),
+        int id = nextId;
+        nextId = nextId == Integer.MAX_VALUE ? 1 : nextId + 1;
+        PENDING.add(new Pending(id, matcher, source.stack().copyWithCount(1), ShulkerRetriever.countInInventory(client.player.getInventory(), matcher),
                 source.entry().dimensionId(), source.entry().pos(), source.slot(), ticks + ShulkerRetriever.timeoutTicks(client)));
-        StorageActions.takeNow(source, amount, toHand);
-        Configs.debug("Requested {}x {} from linked container {} slot {}", amount, source.stack().getItem(), source.entry().pos(), source.slot());
+        StorageActions.takeNow(id, source, amount, toHand);
+        Configs.debug("Request {} (tick {}): {}x {} from linked container {} slot {}", id, ticks, amount, source.stack().getItem(), source.entry().pos(), source.slot());
         return true;
     }
 }

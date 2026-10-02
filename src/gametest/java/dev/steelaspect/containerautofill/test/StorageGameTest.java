@@ -331,10 +331,16 @@ public class StorageGameTest implements FabricClientGameTest {
         check("P1 single-item pulls arrive within 3 ticks on average", pulls == 10 && average <= 3.0, pulls + " pulls, avg " + average);
 
         // P2: the cache says a slot holds sponge but the container doesn't: the request must not hang.
-        context.runOnClient(client -> StorageContents.get(overworld, chestA).items().put(20, stack(Items.SPONGE, 1)));
-        context.runOnClient(client -> dev.steelaspect.containerautofill.storage.StorageRetriever.request(client, s -> s.isOf(Items.SPONGE), 1, true));
+        context.waitTicks(10); // let pending refreshes of chestA land first, they would replace the fake entry
+        boolean sent = context.computeOnClient(client -> {
+            StorageContents.get(overworld, chestA).items().put(20, stack(Items.SPONGE, 1));
+            return dev.steelaspect.containerautofill.storage.StorageRetriever.request(client, s -> s.isOf(Items.SPONGE), 1, true)
+                    && dev.steelaspect.containerautofill.storage.StorageRetriever.isWaiting();
+        });
         int missTicks;
-        try {
+        if (!sent) {
+            missTicks = 999;
+        } else try {
             missTicks = context.waitFor(client -> !dev.steelaspect.containerautofill.storage.StorageRetriever.isWaiting(), 80);
         } catch (Throwable t) {
             missTicks = 999;
@@ -362,6 +368,7 @@ public class StorageGameTest implements FabricClientGameTest {
                     .addSchematicPlacement(SchematicPlacement.createFor(rowSchematic[0], row.get(0), "speed-row", true, true), false);
             fi.dy.masa.litematica.config.Configs.Generic.EASY_PLACE_MODE.setBooleanValue(true);
             fi.dy.masa.litematica.config.Configs.Generic.EASY_PLACE_FIRST.setBooleanValue(false);
+            Configs.DEBUG_LOGGING.setBooleanValue(true);
             client.player.getInventory().setSelectedSlot(0);
             StorageActions.refreshAll();
         });
@@ -380,11 +387,14 @@ public class StorageGameTest implements FabricClientGameTest {
             fi.dy.masa.litematica.config.Configs.Generic.EASY_PLACE_MODE.setBooleanValue(false);
             fi.dy.masa.litematica.config.Configs.Generic.EASY_PLACE_FIRST.setBooleanValue(true);
             Configs.SINGLE_ITEM_MODE.setBooleanValue(false);
+            Configs.DEBUG_LOGGING.setBooleanValue(false);
             var manager = DataManager.getSchematicPlacementManager();
             for (SchematicPlacement placement : new ArrayList<>(manager.getAllSchematicsPlacements())) {
                 if ("speed-row".equals(placement.getName())) manager.removeSchematicPlacement(placement);
             }
         });
+        LOG.info("P3 row after: {}", (Object) context.<String, RuntimeException>computeOnClient(client -> row.stream()
+                .map(p -> client.world.getBlockState(p).getBlock().getName().getString()).toList().toString()));
         int taken = before - containerCount(world, chestA, Items.STONE);
         LOG.info("SPEED P3 easy place, single-item mode: 3 blocks placed in {} ticks, {} stone taken from storage", placeTicks, taken);
         check("P3 easy place with single-item mode places all 3 blocks", placeTicks >= 0, "not all placed");

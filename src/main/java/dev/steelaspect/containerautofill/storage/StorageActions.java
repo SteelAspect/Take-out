@@ -44,6 +44,8 @@ public final class StorageActions {
     private static long ticks;
     private static long lastAction;
     private static long lastRefresh = -REFRESH_INTERVAL_TICKS;
+    /** A full refresh was asked for while another refresh was still being sent; run it once that's done. */
+    private static boolean refreshQueued;
     private static BlockPos boxCorner;
     private static Set<StorageContents.Key> lookAt = Set.of();
     private static long lookAtUntil;
@@ -67,7 +69,8 @@ public final class StorageActions {
             StorageContents.request(entries);
         }
         // Keep the cache fresh while something needs it (menu open, auto-fill, auto take-out).
-        if (ticks - lastRefresh >= REFRESH_INTERVAL_TICKS && wantsRefresh(client)) {
+        if ((refreshQueued && !StorageContents.isRefreshing())
+                || (ticks - lastRefresh >= REFRESH_INTERVAL_TICKS && wantsRefresh(client))) {
             refreshAll();
         }
     }
@@ -80,7 +83,8 @@ public final class StorageActions {
 
     public static void refreshAll() {
         lastRefresh = ticks;
-        if (StorageContents.isRefreshing()) return;
+        refreshQueued = StorageContents.isRefreshing();
+        if (refreshQueued) return;
         StorageContents.request(StorageStore.linkedEntries());
     }
 
@@ -202,8 +206,8 @@ public final class StorageActions {
     }
 
     /** Sends one take request right away (used by retrieval, which waits for it). */
-    public static void takeNow(Source source, int count, boolean toHand) {
-        ClientPlayNetworking.send(new StoragePayloads.Take(source.entry().dimensionId(), source.entry().pos(), source.slot(), count, toHand));
+    public static void takeNow(int requestId, Source source, int count, boolean toHand) {
+        ClientPlayNetworking.send(new StoragePayloads.Take(requestId, source.entry().dimensionId(), source.entry().pos(), source.slot(), count, toHand));
         DIRTY.add(new StorageContents.Key(source.entry().dimensionId(), source.entry().pos()));
         StorageContents.Snapshot snapshot = StorageContents.get(source.entry().dimensionId(), source.entry().pos());
         if (snapshot != null) {
@@ -214,7 +218,7 @@ public final class StorageActions {
     }
 
     private static void queueTake(Source source, int count, boolean toHand) {
-        QUEUE.add(new StoragePayloads.Take(source.entry().dimensionId(), source.entry().pos(), source.slot(), count, toHand));
+        QUEUE.add(new StoragePayloads.Take(0, source.entry().dimensionId(), source.entry().pos(), source.slot(), count, toHand));
         DIRTY.add(new StorageContents.Key(source.entry().dimensionId(), source.entry().pos()));
     }
 
@@ -315,6 +319,7 @@ public final class StorageActions {
     public static void reset() {
         QUEUE.clear();
         DIRTY.clear();
+        refreshQueued = false;
         boxCorner = null;
         lookAt = Set.of();
     }

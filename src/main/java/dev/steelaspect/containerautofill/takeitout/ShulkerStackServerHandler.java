@@ -33,6 +33,9 @@ public final class ShulkerStackServerHandler {
         if (shulkerSlot < 0 || shulkerSlot >= ShulkerUtil.PLAYER_MAIN_SLOTS) return;
         if (innerSlot < 0 || innerSlot >= ShulkerUtil.SHULKER_SLOTS) return;
 
+        // Flush earlier changes first, so "hand emptied by a placement, then refilled here" is synced as two
+        // changes rather than looking unchanged.
+        player.currentScreenHandler.sendContentUpdates();
         PlayerInventory inventory = player.getInventory();
         ItemStack box = inventory.getStack(shulkerSlot);
         if (!ShulkerUtil.isShulkerBox(box) || box.getCount() != 1) return;

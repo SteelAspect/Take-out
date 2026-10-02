@@ -109,3 +109,4 @@ Record each run here (date, version, environment, pass/fail per case).
 | 2026-10-02 | 1.0.0+1.21.11 | runClientGameTest (main + storage/instant + menus), Xvfb | 53/53 + 22/22 pass (crafter known issue logged) |
 | 2026-10-02 | 1.0.0+1.21.11 | runClientGameTest (main + storage/instant/area/creative + menus), Xvfb | 53/53 + 30/30 pass (crafter known issue logged) |
 | – | – | Not testable here | C12 (needs a separate Fabric server + client connection), D3 (needs the original mods' jars) |
+| 2026-10-02 | 1.0.0+1.21.11 | Cloud container, client gametests under Xvfb | Full suite 53/53 + 34/34 (crafter known issue logged). Speed: single-item pull 1.1 ticks avg (was 1.5); easy place single-item, 3 blocks: 4 ticks with exactly 3 items taken (was 69 ticks and 4 taken) |

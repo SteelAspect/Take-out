@@ -69,13 +69,16 @@ public final class StorageServerHandler {
     }
 
     private static void take(ServerPlayerEntity player, StoragePayloads.Take request) {
-        int moved = moveToPlayer(player, request);
         if (player == null) return;
+        // Flush earlier changes first (e.g. the block just placed from the hand). Otherwise "1 -> 0 -> 1"
+        // within one tick looks unchanged to the sync and the client never hears that a new item arrived.
+        player.currentScreenHandler.sendContentUpdates();
+        int moved = moveToPlayer(player, request);
         // Sync the inventory now instead of at the end of the tick, then answer, so the client sees the
         // item before the reply and can use it (or try another source) straight away.
         player.currentScreenHandler.sendContentUpdates();
         if (ServerPlayNetworking.canSend(player, StoragePayloads.Taken.ID)) {
-            ServerPlayNetworking.send(player, new StoragePayloads.Taken(request.dimension(), request.pos(), request.slot(), moved));
+            ServerPlayNetworking.send(player, new StoragePayloads.Taken(request.requestId(), request.dimension(), request.pos(), request.slot(), moved));
         }
     }
 
