@@ -4,6 +4,7 @@
   "package": "dev.steelaspect.containerautofill.mixin",
   "compatibilityLevel": "JAVA_21",
   "client": [
+    "ClientPlayNetworkHandlerMixin",
     "ClientPlayerInteractionManagerMixin",
     "LitematicaInventoryUtilsMixin"
   ],

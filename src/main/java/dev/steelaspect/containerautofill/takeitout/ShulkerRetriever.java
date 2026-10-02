@@ -73,6 +73,19 @@ public final class ShulkerRetriever {
         }
     }
 
+    /**
+     * Inventory packet hook: clears the request as soon as the item itself is in the inventory. (Unlike the
+     * tick check this ignores the shulker changing, which can be synced a moment before the item.)
+     */
+    public static boolean onInventoryChanged(MinecraftClient client) {
+        if (pending == null || client.player == null) return false;
+        ItemStack item = pending.item();
+        if (countInInventory(client.player.getInventory(), s -> ItemStack.areItemsAndComponentsEqual(s, item)) <= pending.countBefore()) return false;
+        Configs.debug("Shulker request for {} arrived", item);
+        pending = null;
+        return true;
+    }
+
     public static void reset() {
         pending = null;
         warnedUnsupported = false;
@@ -152,8 +165,8 @@ public final class ShulkerRetriever {
         return inner.isEmpty() || !ItemStack.areItemsAndComponentsEqual(inner, request.item());
     }
 
-    /** Round trip allowance: 2.5x the player's ping plus 200 ms, clamped to 1..10 seconds. */
-    private static int timeoutTicks(MinecraftClient client) {
+    /** Round trip allowance if no answer comes: 2.5x the player's ping plus 200 ms, clamped to 0.5..10 seconds. */
+    public static int timeoutTicks(MinecraftClient client) {
         int pingMs = 0;
         if (client.getNetworkHandler() != null && client.player != null) {
             PlayerListEntry entry = client.getNetworkHandler().getPlayerListEntry(client.player.getUuid());
@@ -161,6 +174,6 @@ public final class ShulkerRetriever {
         }
         if (pingMs <= 0) pingMs = 180;
         int ticks = (int) Math.ceil((pingMs * 2.5 + 200) / 50.0);
-        return Math.max(20, Math.min(ticks, 200));
+        return Math.max(10, Math.min(ticks, 200));
     }
 }

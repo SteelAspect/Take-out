@@ -73,6 +73,9 @@
 | S6 | Storage menu | Press `Y` | Menu opens (All Items / Containers / Groups) |
 | S7 | Remote take | Take 10 emeralds from the chest 160 blocks away | Player +10, chest −10 |
 | S8 | Pick block from storage | Middle-click a gold block you only have in a linked chest | Gold block in the main hand |
+| P1 | Single-item pull speed | Single-item Mode on; pull 1 stone into an empty hand 10 times | All 10 arrive, ≤ 3 ticks each on average (logged as `SPEED P1`) |
+| P2 | Stale storage cache | The cache says a slot has an item the chest doesn't have; pick it | The request is freed within 5 ticks (not a 3 s wait) and the chest is re-read |
+| P3–P4 | Easy place, single-item mode | Easy place on, hold right-click at a row of 3 schematic stone blocks, stone only in a linked chest | All 3 placed (time logged as `SPEED P3`); exactly 3 stone taken, none left over |
 | S9 | Dump | Dump key with cobblestone/dirt in main inventory, torches in hotbar | Main inventory moved into the dump chest, hotbar kept |
 | S10–S12 | Look At, groups | Look At iron; new group; switch back; share + import | Marked; group empty then restored; import copies all entries |
 

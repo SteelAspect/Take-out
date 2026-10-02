@@ -47,6 +47,10 @@ public class ContainerAutoFillClient implements ClientModInitializer {
 
         ClientTickEvents.END_CLIENT_TICK.register(ContainerAutoFillClient::onEndTick);
         ClientPlayNetworking.registerGlobalReceiver(StoragePayloads.Contents.ID, (payload, context) -> StorageContents.onContents(payload));
+        ClientPlayNetworking.registerGlobalReceiver(StoragePayloads.Taken.ID, (payload, context) -> {
+            if (StorageRetriever.onTaken(context.client(), payload)) TakeItOutFeatures.onStorageMiss(context.client());
+            else TakeItOutFeatures.onInventoryPacket(context.client());
+        });
         ClientPlayNetworking.registerGlobalReceiver(FillPayloads.Result.ID, (payload, context) -> InstantFill.onResult(context.client(), payload));
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> StorageStore.load(client));
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
@@ -56,6 +60,7 @@ public class ContainerAutoFillClient implements ClientModInitializer {
             StorageActions.reset();
             InstantFill.reset();
             StorageRetriever.reset();
+            TakeItOutFeatures.reset();
             StorageContents.clear();
             StorageStore.unload();
         });

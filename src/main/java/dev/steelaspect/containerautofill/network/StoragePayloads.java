@@ -44,6 +44,25 @@ public final class StoragePayloads {
         }
     }
 
+    /**
+     * Answer to {@link Take}, sent after the player's inventory has been synced: how many items were moved
+     * (0 if the slot was empty or the container couldn't be reached), so the client never waits on a miss.
+     */
+    public record Taken(Identifier dimension, BlockPos pos, int slot, int moved) implements CustomPayload {
+        public static final Id<Taken> ID = new Id<>(id("taken"));
+        public static final PacketCodec<RegistryByteBuf, Taken> CODEC = PacketCodec.tuple(
+                Identifier.PACKET_CODEC, Taken::dimension,
+                BlockPos.PACKET_CODEC, Taken::pos,
+                PacketCodecs.VAR_INT, Taken::slot,
+                PacketCodecs.VAR_INT, Taken::moved,
+                Taken::new);
+
+        @Override
+        public Id<? extends CustomPayload> getId() {
+            return ID;
+        }
+    }
+
     /** Move up to {@code count} items from a player inventory slot (0..35) into a container. */
     public record Deposit(Identifier dimension, BlockPos pos, int playerSlot, int count) implements CustomPayload {
         public static final Id<Deposit> ID = new Id<>(id("deposit"));

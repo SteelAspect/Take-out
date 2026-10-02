@@ -7,7 +7,9 @@ package dev.steelaspect.containerautofill.takeitout;
 
 import dev.steelaspect.containerautofill.config.Configs;
 import dev.steelaspect.containerautofill.storage.StorageRetriever;
+import fi.dy.masa.litematica.config.Hotkeys;
 import fi.dy.masa.litematica.materials.MaterialCache;
+import fi.dy.masa.litematica.util.EasyPlaceUtils;
 import fi.dy.masa.litematica.util.RayTraceUtils;
 import fi.dy.masa.litematica.util.WorldUtils;
 import fi.dy.masa.litematica.world.SchematicWorldHandler;
@@ -36,10 +38,20 @@ import java.util.function.Predicate;
 public final class TakeItOutFeatures {
     private static final double AUTO_LOOK_RANGE = 3.0;
     private static final double RIGHT_CLICK_RANGE = 5.0;
+    /** How long an easy place attempt that had to wait for an item stays eligible for the instant retry. */
+    private static final int RETRY_WINDOW_TICKS = 100;
 
     private static boolean useKeyWasDown;
+    private static long ticks;
+    /** Item an easy place attempt is waiting for; easy place runs again the moment it arrives. */
+    private static ItemStack retryItem = ItemStack.EMPTY;
+    private static long retryUntil;
 
     private TakeItOutFeatures() {
+    }
+
+    public static void reset() {
+        retryItem = ItemStack.EMPTY;
     }
 
     public static void toggleAutoTakeOut(MinecraftClient client) {
@@ -51,6 +63,7 @@ public final class TakeItOutFeatures {
     }
 
     public static void tick(MinecraftClient client) {
+        ticks++;
         boolean useDown = client.options.useKey.isPressed();
         boolean useClicked = useDown && !useKeyWasDown;
         useKeyWasDown = useDown;
@@ -58,7 +71,6 @@ public final class TakeItOutFeatures {
         if (!Configs.AUTO_TAKE_OUT.getBooleanValue()) return;
         if (client.player == null || client.world == null || client.currentScreen != null) return;
         if (client.player.isCreative() || !client.player.getAbilities().allowModifyWorld) return;
-        if (ShulkerRetriever.isWaiting() || StorageRetriever.isWaiting()) return;
 
         WorldSchematic schematic = SchematicWorldHandler.getSchematicWorld();
         if (schematic == null) return;
@@ -89,9 +101,58 @@ public final class TakeItOutFeatures {
         Predicate<ItemStack> matcher = s -> ItemStack.areItemsAndComponentsEqual(s, required);
         if (ShulkerRetriever.countInInventory(client.player.getInventory(), matcher) > 0) return false;
         if (!isSelectedSlotPickBlockable(client)) return false;
-        if (ShulkerRetriever.isWaitingFor(required) || StorageRetriever.isWaiting()) return true;
+        if (ShulkerRetriever.isWaitingFor(required) || StorageRetriever.isWaitingFor(required)) return true;
 
-        return requestFromAnySource(client, required, matcher);
+        boolean requested = requestFromAnySource(client, required, matcher);
+        if (requested && fi.dy.masa.litematica.config.Configs.Generic.EASY_PLACE_MODE.getBooleanValue()) {
+            retryItem = required.copyWithCount(1);
+            retryUntil = ticks + RETRY_WINDOW_TICKS;
+        }
+        return requested;
+    }
+
+    /**
+     * Called when an inventory packet has been applied: clears finished requests and, if easy place was
+     * waiting for this item, places it right away instead of on the next use tick.
+     */
+    public static void onInventoryPacket(MinecraftClient client) {
+        boolean arrived = ShulkerRetriever.onInventoryChanged(client) | StorageRetriever.onInventoryChanged(client);
+        if (arrived) retryEasyPlace(client, false);
+    }
+
+    /** The server found a linked slot empty: easy place tries again now, which picks the next source. */
+    public static void onStorageMiss(MinecraftClient client) {
+        retryEasyPlace(client, true);
+    }
+
+    @SuppressWarnings("deprecation")
+    private static void retryEasyPlace(MinecraftClient client, boolean evenIfMissing) {
+        if (retryItem.isEmpty() || client.player == null) return;
+        if (ticks > retryUntil) {
+            retryItem = ItemStack.EMPTY;
+            return;
+        }
+        ItemStack item = retryItem;
+        boolean present = ShulkerRetriever.countInInventory(client.player.getInventory(), s -> ItemStack.areItemsAndComponentsEqual(s, item)) > 0;
+        if (!present && !evenIfMissing) return;
+        retryItem = ItemStack.EMPTY;
+
+        if (client.currentScreen != null || client.world == null) return;
+        if (!Configs.ENABLE_MOD.getBooleanValue()) return;
+        if (!fi.dy.masa.litematica.config.Configs.Generic.EASY_PLACE_MODE.getBooleanValue()) return;
+        if (!Hotkeys.EASY_PLACE_ACTIVATION.getKeybind().isKeybindHeld()) return;
+
+        boolean rewrite = fi.dy.masa.litematica.config.Configs.Generic.EASY_PLACE_POST_REWRITE.getBooleanValue();
+        boolean hold = fi.dy.masa.litematica.config.Configs.Generic.EASY_PLACE_HOLD_ENABLED.getBooleanValue();
+        Configs.debug("Item {} ready, retrying easy place now", item);
+        if (rewrite) {
+            if (hold) EasyPlaceUtils.easyPlaceOnUseTick();
+            else EasyPlaceUtils.handleEasyPlaceWithMessage();
+        } else if (hold) {
+            WorldUtils.easyPlaceOnUseTick(client);
+        } else {
+            WorldUtils.handleEasyPlace(client);
+        }
     }
 
     /** Shulker in the inventory first (like TakeItOut), then linked storage; the item goes to the main hand. */
@@ -112,7 +173,7 @@ public final class TakeItOutFeatures {
 
         Predicate<ItemStack> matcher = s -> ItemStack.areItemsAndComponentsEqual(s, stack);
         if (ShulkerRetriever.countInInventory(client.player.getInventory(), matcher) > 0) return;
-        if (ShulkerRetriever.isWaiting() || StorageRetriever.isWaiting()) return;
+        if (ShulkerRetriever.isWaitingFor(stack) || StorageRetriever.isWaitingFor(stack)) return;
         requestFromAnySource(client, stack, matcher);
     }
 

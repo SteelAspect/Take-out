@@ -80,6 +80,7 @@ public class StorageGameTest implements FabricClientGameTest {
             testMenuScreenshots(context, world);
             testRemoteTake(context, world);
             testPickBlockFromStorage(context, world);
+            testPullSpeed(context, world);
             testDump(context, world);
             testInstantFill(context, world);
             testAreaFillAndServerStatus(context, world);
@@ -302,6 +303,93 @@ public class StorageGameTest implements FabricClientGameTest {
         } catch (Throwable t) {
             check("S8 pick block pulls the block from a linked container into the hand", false, "main hand empty");
         }
+    }
+
+    /** P1-P4: how quickly single-item pulls and easy place with single-item mode run (ticks are logged). */
+    private void testPullSpeed(ClientGameTestContext context, TestSingleplayerContext world) {
+        Predicate<ItemStack> isStone = s -> s.isOf(Items.STONE);
+        context.runOnClient(client -> {
+            Configs.SINGLE_ITEM_MODE.setBooleanValue(true);
+            StorageActions.refreshAll();
+        });
+        context.waitTicks(10);
+
+        // P1: ten single-item pulls into the hand, one after another.
+        int total = 0, pulls = 0;
+        for (int i = 0; i < 10; i++) {
+            world.getServer().runOnServer(server -> player(server).getInventory().clear());
+            context.waitFor(client -> client.player.getInventory().isEmpty(), 40);
+            context.runOnClient(client -> dev.steelaspect.containerautofill.storage.StorageRetriever.request(client, isStone, 1, true));
+            try {
+                total += context.waitFor(client -> client.player.getMainHandStack().isOf(Items.STONE), 60);
+                pulls++;
+            } catch (Throwable ignored) {
+            }
+        }
+        double average = pulls == 0 ? 99 : (double) total / pulls;
+        LOG.info("SPEED P1 single-item pull: {} of 10 arrived, average {} ticks", pulls, String.format(Locale.ROOT, "%.2f", average));
+        check("P1 single-item pulls arrive within 3 ticks on average", pulls == 10 && average <= 3.0, pulls + " pulls, avg " + average);
+
+        // P2: the cache says a slot holds sponge but the container doesn't: the request must not hang.
+        context.runOnClient(client -> StorageContents.get(overworld, chestA).items().put(20, stack(Items.SPONGE, 1)));
+        context.runOnClient(client -> dev.steelaspect.containerautofill.storage.StorageRetriever.request(client, s -> s.isOf(Items.SPONGE), 1, true));
+        int missTicks;
+        try {
+            missTicks = context.waitFor(client -> !dev.steelaspect.containerautofill.storage.StorageRetriever.isWaiting(), 80);
+        } catch (Throwable t) {
+            missTicks = 999;
+        }
+        LOG.info("SPEED P2 stale-cache miss released after {} ticks", missTicks);
+        check("P2 a miss (stale cache) frees the request within 5 ticks", missTicks <= 5, missTicks + " ticks");
+
+        // P3/P4: easy place with single-item mode, three stone blocks in a row taken one at a time from storage.
+        BlockPos stand = chestA.add(-8, 0, 0);
+        List<BlockPos> row = List.of(stand.add(0, 1, -3), stand.add(0, 1, -2), stand.add(0, 1, -1));
+        LitematicaSchematic[] rowSchematic = new LitematicaSchematic[1];
+        world.getServer().runOnServer(server -> {
+            ServerWorld w = server.getOverworld();
+            for (BlockPos p : row) w.setBlockState(p, Blocks.STONE.getDefaultState());
+            AreaSelection area = new AreaSelection();
+            area.addSubRegionBox(new Box(row.get(0), row.get(2), "row"), false);
+            area.setExplicitOrigin(row.get(0));
+            rowSchematic[0] = LitematicaSchematic.createFromWorld(w, area, new LitematicaSchematic.SchematicSaveInfo(false, true), "steelaspect", msg -> {});
+            for (BlockPos p : row) w.setBlockState(p, Blocks.AIR.getDefaultState());
+            player(server).getInventory().clear();
+        });
+        world.getServer().runCommand(String.format(Locale.ROOT, "tp @p %.1f %d %.1f 180 0", stand.getX() + 0.5, stand.getY(), stand.getZ() + 0.5));
+        context.runOnClient(client -> {
+            DataManager.getSchematicPlacementManager()
+                    .addSchematicPlacement(SchematicPlacement.createFor(rowSchematic[0], row.get(0), "speed-row", true, true), false);
+            fi.dy.masa.litematica.config.Configs.Generic.EASY_PLACE_MODE.setBooleanValue(true);
+            fi.dy.masa.litematica.config.Configs.Generic.EASY_PLACE_FIRST.setBooleanValue(false);
+            client.player.getInventory().setSelectedSlot(0);
+            StorageActions.refreshAll();
+        });
+        context.waitTicks(20);
+        int before = containerCount(world, chestA, Items.STONE);
+        context.getInput().holdMouse(GLFW.GLFW_MOUSE_BUTTON_RIGHT);
+        int placeTicks;
+        try {
+            placeTicks = context.waitFor(client -> row.stream().allMatch(p -> client.world.getBlockState(p).isOf(Blocks.STONE)), 200);
+        } catch (Throwable t) {
+            placeTicks = -1;
+        }
+        context.getInput().releaseMouse(GLFW.GLFW_MOUSE_BUTTON_RIGHT);
+        context.waitTicks(5);
+        context.runOnClient(client -> {
+            fi.dy.masa.litematica.config.Configs.Generic.EASY_PLACE_MODE.setBooleanValue(false);
+            fi.dy.masa.litematica.config.Configs.Generic.EASY_PLACE_FIRST.setBooleanValue(true);
+            Configs.SINGLE_ITEM_MODE.setBooleanValue(false);
+            var manager = DataManager.getSchematicPlacementManager();
+            for (SchematicPlacement placement : new ArrayList<>(manager.getAllSchematicsPlacements())) {
+                if ("speed-row".equals(placement.getName())) manager.removeSchematicPlacement(placement);
+            }
+        });
+        int taken = before - containerCount(world, chestA, Items.STONE);
+        LOG.info("SPEED P3 easy place, single-item mode: 3 blocks placed in {} ticks, {} stone taken from storage", placeTicks, taken);
+        check("P3 easy place with single-item mode places all 3 blocks", placeTicks >= 0, "not all placed");
+        check("P4 single-item mode took exactly 1 item per block", taken == 3 && serverCount(world, isStone) == 0,
+                "taken=" + taken + " left in inventory=" + serverCount(world, isStone));
     }
 
     private void testDump(ClientGameTestContext context, TestSingleplayerContext world) {

@@ -62,6 +62,8 @@ public final class ShulkerStackServerHandler {
             }
         }
         inventory.markDirty();
+        // Sync now rather than at the end of the tick, so the item reaches the client sooner.
+        player.currentScreenHandler.sendContentUpdates();
     }
 
     private static boolean canTradeIntoShulker(ItemStack stack) {

@@ -49,6 +49,7 @@ public final class StorageServerHandler {
         PayloadTypeRegistry.playC2S().register(StoragePayloads.Deposit.ID, StoragePayloads.Deposit.CODEC);
         PayloadTypeRegistry.playC2S().register(StoragePayloads.Query.ID, StoragePayloads.Query.CODEC);
         PayloadTypeRegistry.playS2C().register(StoragePayloads.Contents.ID, StoragePayloads.Contents.CODEC);
+        PayloadTypeRegistry.playS2C().register(StoragePayloads.Taken.ID, StoragePayloads.Taken.CODEC);
 
         ServerPlayNetworking.registerGlobalReceiver(StoragePayloads.Take.ID, (p, ctx) -> take(ctx.player(), p));
         ServerPlayNetworking.registerGlobalReceiver(StoragePayloads.Deposit.ID, (p, ctx) -> deposit(ctx.player(), p));
@@ -68,13 +69,25 @@ public final class StorageServerHandler {
     }
 
     private static void take(ServerPlayerEntity player, StoragePayloads.Take request) {
+        int moved = moveToPlayer(player, request);
+        if (player == null) return;
+        // Sync the inventory now instead of at the end of the tick, then answer, so the client sees the
+        // item before the reply and can use it (or try another source) straight away.
+        player.currentScreenHandler.sendContentUpdates();
+        if (ServerPlayNetworking.canSend(player, StoragePayloads.Taken.ID)) {
+            ServerPlayNetworking.send(player, new StoragePayloads.Taken(request.dimension(), request.pos(), request.slot(), moved));
+        }
+    }
+
+    private static int moveToPlayer(ServerPlayerEntity player, StoragePayloads.Take request) {
         Inventory inventory = inventoryAt(player, request.dimension(), request.pos(), true);
-        if (inventory == null || request.slot() < 0 || request.slot() >= inventory.size() || request.count() <= 0) return;
+        if (inventory == null || request.slot() < 0 || request.slot() >= inventory.size() || request.count() <= 0) return 0;
 
         ItemStack inSlot = inventory.getStack(request.slot());
-        if (inSlot.isEmpty()) return;
+        if (inSlot.isEmpty()) return 0;
         ItemStack moved = inventory.removeStack(request.slot(), Math.min(request.count(), inSlot.getCount()));
-        if (moved.isEmpty()) return;
+        if (moved.isEmpty()) return 0;
+        int amount = moved.getCount();
         inventory.markDirty();
 
         PlayerInventory playerInventory = player.getInventory();
@@ -83,15 +96,17 @@ public final class StorageServerHandler {
             if (free >= 0 && free < ShulkerUtil.PLAYER_MAIN_SLOTS) {
                 playerInventory.setStack(free, playerInventory.getSelectedStack());
                 playerInventory.setSelectedStack(moved);
-                return;
+                return amount;
             }
         }
         playerInventory.insertStack(moved);
         if (!moved.isEmpty()) {
+            amount -= moved.getCount();
             ItemStack left = HopperBlockEntity.transfer(null, inventory, moved, null);
             if (!left.isEmpty()) player.dropItem(left, false);
             inventory.markDirty();
         }
+        return amount;
     }
 
     private static void deposit(ServerPlayerEntity player, StoragePayloads.Deposit request) {

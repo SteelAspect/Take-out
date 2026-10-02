@@ -101,6 +101,7 @@ Link containers once, then take items from them, or put items into them, **from 
 - **Dump:** mark containers as dump targets (*Mark Dump Container*), then *Dump to Containers* moves your main inventory (not the hotbar) into them.
 - **Outlines:** linked containers are outlined in green and dump containers in orange. You can toggle this and change the colours.
 - **Pulling from storage:** auto-fill, pick block and Auto Take Out pull missing items from linked containers too. *Single-item Mode* (`B`) makes pick block take 1 item.
+- **Speed:** pulled items are used the moment they arrive. With easy place, the block is placed as soon as the item reaches your hand, without waiting for the next click or tick. The server sends the item straight away and says if a slot turned out to be empty, so the next container is tried at once instead of after a 3 second wait. Pulls for different items can run at the same time. On a server, single-item mode still needs one round trip per block, so it's limited by your ping.
 - Links are saved per world/server in `config/containerautofill/storage/`. There's no limit on how many containers you link.
 
 ## Hotkeys
