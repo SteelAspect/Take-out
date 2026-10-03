@@ -16,6 +16,8 @@ import net.minecraft.block.BlockState;
 import net.minecraft.block.ChestBlock;
 import net.minecraft.block.enums.ChestType;
 import net.minecraft.util.math.Direction;
+import dev.steelaspect.containerautofill.network.SharedGroupPayloads;
+import dev.steelaspect.containerautofill.storage.SharedGroups;
 import dev.steelaspect.containerautofill.storage.StorageActions;
 import dev.steelaspect.containerautofill.storage.StorageContents;
 import dev.steelaspect.containerautofill.storage.StorageRetriever;
@@ -195,6 +197,8 @@ public class StorageGameTest implements FabricClientGameTest {
         context.waitTicks(2);
         check("S1 H links the looked-at container", StorageStore.find(overworld, chestA) != null, "not linked");
 
+        String groupBefore = StorageStore.activeGroup().name;
+        int groupsBefore = StorageStore.groups().size();
         lookAt(context, world, chestB);
         context.getInput().pressKey(GLFW.GLFW_KEY_J);
         lookAt(context, world, dumpChest);
@@ -202,6 +206,10 @@ public class StorageGameTest implements FabricClientGameTest {
         context.waitTicks(2);
         check("S2 box select links every container in the box", StorageStore.find(overworld, chestB) != null
                 && StorageStore.find(overworld, dumpChest) != null, "linked=" + StorageStore.linkedCount());
+        check("S2 box select adds to the selected group (earlier links kept, no new group)",
+                StorageStore.activeGroup().name.equals(groupBefore) && StorageStore.groups().size() == groupsBefore
+                        && StorageStore.find(overworld, chestA) != null,
+                "active=" + StorageStore.activeGroup().name + " groups=" + StorageStore.groups().size());
 
         context.getInput().pressKey(GLFW.GLFW_KEY_U);
         context.waitTicks(2);
@@ -1059,12 +1067,69 @@ public class StorageGameTest implements FabricClientGameTest {
         context.runOnClient(client -> StorageStore.createGroup("Second"));
         check("S11 new group becomes active and starts empty", StorageStore.activeGroup().name.equals("Second") && StorageStore.linkedCount() == 0,
                 "active=" + StorageStore.activeGroup().name);
-        String exported = StorageStore.exportGroup(StorageStore.group(original));
         context.runOnClient(client -> StorageStore.setActive(original));
         check("S11 switching back restores the links", StorageStore.linkedCount() == linked, "count=" + StorageStore.linkedCount());
-        context.runOnClient(client -> StorageStore.importGroup(exported));
-        check("S12 share/import copies a group", StorageStore.activeGroup().containers.size() == StorageStore.group(original).containers.size(),
-                "imported=" + StorageStore.activeGroup().containers.size());
+        testSharedGroups(context, original);
         context.runOnClient(client -> StorageStore.setActive(original));
+    }
+
+    /** G1-G6: sharing a group on the server, adding it, updating it and removing it. */
+    private void testSharedGroups(ClientGameTestContext context, String original) {
+        check("G1 server supports shared groups", context.computeOnClient(client -> SharedGroups.isSupported()), "group_share channel missing");
+        int size = StorageStore.group(original).containers.size();
+        context.runOnClient(client -> SharedGroups.share(client, StorageStore.group(original)));
+        SharedGroupPayloads.Summary shared = waitForShared(context, original);
+        check("G2 shared group is listed for everyone, with its owner and size",
+                shared != null && shared.mine() && shared.removable() && shared.count() == size && !shared.owner().isBlank(),
+                "summary=" + shared);
+        if (shared == null) return;
+        context.runOnClient(client -> {
+            setTab("GROUPS");
+            client.setScreen(new StorageScreen(null));
+        });
+        context.waitTicks(20);
+        LOG.info("Storage screenshot: {}", context.takeScreenshot("storage-groups-shared"));
+        context.runOnClient(client -> {
+            setTab("ITEMS");
+            client.setScreen(null);
+        });
+
+        int groups = StorageStore.groups().size();
+        context.runOnClient(client -> SharedGroups.add(shared.groupId()));
+        try {
+            context.waitFor(client -> StorageStore.groups().size() == groups + 1, 100);
+        } catch (Throwable ignored) {
+        }
+        StorageStore.Group added = StorageStore.activeGroup();
+        check("G3 Add puts a copy in your groups (new name, same containers, linked/dump kept)",
+                StorageStore.groups().size() == groups + 1 && !added.name.equals(original) && added.containers.size() == size
+                        && added.containers.stream().anyMatch(e -> e.dump),
+                "groups=" + StorageStore.groups().size() + " active=" + added.name + " size=" + added.containers.size());
+
+        context.runOnClient(client -> SharedGroups.share(client, StorageStore.group(original)));
+        context.waitTicks(10);
+        long sameName = SharedGroups.list().stream().filter(g -> g.name().equals(original)).count();
+        check("G4 sharing again updates it instead of adding a second one", sameName == 1, "entries=" + sameName);
+
+        boolean saved = context.computeOnClient(client -> client.getServer() != null && Files.isRegularFile(client.getServer()
+                .getSavePath(net.minecraft.util.WorldSavePath.ROOT).resolve("data").resolve("containerautofill_shared_groups.json")));
+        check("G5 shared groups saved in the world folder", saved, "no file");
+
+        context.runOnClient(client -> SharedGroups.unshare(shared.groupId()));
+        try {
+            context.waitFor(client -> SharedGroups.list().isEmpty(), 100);
+        } catch (Throwable ignored) {
+        }
+        check("G6 Remove stops sharing it", SharedGroups.list().isEmpty(), "list=" + SharedGroups.list());
+        String addedName = added.name;
+        context.runOnClient(client -> StorageStore.deleteGroup(addedName));
+    }
+
+    private SharedGroupPayloads.Summary waitForShared(ClientGameTestContext context, String name) {
+        try {
+            context.waitFor(client -> SharedGroups.list().stream().anyMatch(g -> g.name().equals(name)), 100);
+        } catch (Throwable ignored) {
+        }
+        return SharedGroups.list().stream().filter(g -> g.name().equals(name)).findFirst().orElse(null);
     }
 }

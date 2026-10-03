@@ -56,7 +56,6 @@ public class Configs implements IConfigHandler {
     public static final ConfigBoolean LINKED_OUTLINES_THROUGH_WALLS = new ConfigBoolean("linkedOutlinesThroughWalls", true).apply(PREFIX);
     public static final ConfigColor LINKED_OUTLINE_COLOR = new ConfigColor("linkedOutlineColor", "0xFF22C55E").apply(PREFIX);
     public static final ConfigColor DUMP_OUTLINE_COLOR = new ConfigColor("dumpOutlineColor", "0xFFF59E0B").apply(PREFIX);
-    public static final ConfigBoolean BOX_SELECT_CREATES_NEW_GROUP = new ConfigBoolean("boxSelectCreatesNewGroup", false).apply(PREFIX);
 
     public static final ImmutableList<IConfigBase> GENERIC = ImmutableList.of(
             ENABLE_MOD,
@@ -82,8 +81,7 @@ public class Configs implements IConfigHandler {
             LINKED_OUTLINES,
             LINKED_OUTLINES_THROUGH_WALLS,
             LINKED_OUTLINE_COLOR,
-            DUMP_OUTLINE_COLOR,
-            BOX_SELECT_CREATES_NEW_GROUP
+            DUMP_OUTLINE_COLOR
     );
 
     // --- Restock (own page, independent of every other option) ---
@@ -111,6 +109,7 @@ public class Configs implements IConfigHandler {
     public static final ConfigBooleanHotkeyed HIGHLIGHT_CONTAINERS = new ConfigBooleanHotkeyed("highlightContainers", true, "").apply(PREFIX);
     public static final ConfigInteger HIGHLIGHT_RANGE = new ConfigInteger("highlightRange", 32, 4, 128).apply(PREFIX);
     public static final ConfigBoolean HIGHLIGHT_THROUGH_WALLS = new ConfigBoolean("highlightThroughWalls", false).apply(PREFIX);
+    public static final ConfigBoolean HIGHLIGHT_THROUGH_LIQUIDS = new ConfigBoolean("highlightThroughLiquids", true).apply(PREFIX);
     public static final ConfigBoolean HIGHLIGHT_SHOW_CORRECT = new ConfigBoolean("highlightShowCorrect", true).apply(PREFIX);
     public static final ConfigBoolean HIGHLIGHT_SHOW_UNKNOWN = new ConfigBoolean("highlightShowUnknown", true).apply(PREFIX);
     public static final ConfigColor COLOR_CORRECT = new ConfigColor("colorCorrect", "0x4033DD55").apply(PREFIX);
@@ -123,6 +122,7 @@ public class Configs implements IConfigHandler {
             HIGHLIGHT_CONTAINERS,
             HIGHLIGHT_RANGE,
             HIGHLIGHT_THROUGH_WALLS,
+            HIGHLIGHT_THROUGH_LIQUIDS,
             HIGHLIGHT_SHOW_CORRECT,
             HIGHLIGHT_SHOW_UNKNOWN,
             COLOR_CORRECT,

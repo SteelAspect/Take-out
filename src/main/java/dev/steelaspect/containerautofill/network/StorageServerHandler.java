@@ -63,6 +63,7 @@ public final class StorageServerHandler {
         ServerPlayNetworking.registerGlobalReceiver(StoragePayloads.Query.ID, (p, ctx) -> query(ctx.player(), p));
         FillServerHandler.register();
         RestockServerHandler.register();
+        SharedGroupsServerHandler.register();
     }
 
     static Inventory inventoryAt(ServerPlayerEntity player, Identifier dimension, BlockPos pos, boolean announceLock) {

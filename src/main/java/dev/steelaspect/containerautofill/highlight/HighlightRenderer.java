@@ -20,6 +20,7 @@ import org.joml.Matrix4f;
 
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Predicate;
 import dev.steelaspect.containerautofill.storage.StorageActions;
 import dev.steelaspect.containerautofill.storage.StorageContents;
 import dev.steelaspect.containerautofill.storage.StorageStore;
@@ -47,39 +48,47 @@ public final class HighlightRenderer implements IRenderer {
 
         boolean throughWalls = Configs.HIGHLIGHT_THROUGH_WALLS.getBooleanValue();
         Vec3d camera = RenderUtils.camPos();
+        // Boxes behind water or lava only: drawn without the depth test so the liquid doesn't hide them.
+        Set<BlockPos> behindLiquid = throughWalls ? Set.of() : ContainerHighlighter.behindLiquid();
 
         try {
-            try (RenderContext quads = new RenderContext(() -> Reference.MOD_ID + ":highlight/quads", throughWalls
-                    ? MaLiLibPipelines.POSITION_COLOR_TRANSLUCENT_NO_DEPTH_NO_CULL
-                    : MaLiLibPipelines.POSITION_COLOR_TRANSLUCENT_LEQUAL_DEPTH_OFFSET_2)) {
-                BufferBuilder buffer = quads.getBuilder();
-                for (Map.Entry<BlockPos, ContainerStatus> entry : statuses.entrySet()) {
-                    Color4f color = colorFor(entry.getValue());
-                    if (color != null) {
-                        RenderUtils.drawBlockBoundingBoxSidesBatchedQuads(entry.getKey(), camera, color, EXPAND, buffer);
-                    }
-                }
-                draw(quads, buffer);
-            }
-
-            try (RenderContext lines = new RenderContext(() -> Reference.MOD_ID + ":highlight/lines", throughWalls
-                    ? MaLiLibPipelines.DEBUG_LINES_MASA_SIMPLE_NO_DEPTH_NO_CULL
-                    : MaLiLibPipelines.DEBUG_LINES_MASA_SIMPLE_LEQUAL_DEPTH)) {
-                BufferBuilder buffer = lines.getBuilder();
-                for (Map.Entry<BlockPos, ContainerStatus> entry : statuses.entrySet()) {
-                    Color4f color = colorFor(entry.getValue());
-                    if (color != null) {
-                        Color4f outline = new Color4f(color.r, color.g, color.b, 0.9f);
-                        RenderUtils.drawBlockBoundingBoxOutlinesBatchedLinesSimple(entry.getKey(), outline, EXPAND, LINE_WIDTH, buffer);
-                    }
-                }
-                draw(lines, buffer);
-            }
+            drawBoxes(statuses, pos -> !behindLiquid.contains(pos), camera, throughWalls, "highlight");
+            if (!behindLiquid.isEmpty()) drawBoxes(statuses, behindLiquid::contains, camera, true, "highlight_liquid");
         } catch (Exception e) {
             if (!this.loggedError) {
                 this.loggedError = true;
                 Reference.LOGGER.warn("Container highlight rendering failed", e);
             }
+        }
+    }
+
+    /** Coloured sides plus an outline for each container {@code include} accepts. */
+    private static void drawBoxes(Map<BlockPos, ContainerStatus> statuses, Predicate<BlockPos> include, Vec3d camera, boolean noDepth, String name) throws Exception {
+        try (RenderContext quads = new RenderContext(() -> Reference.MOD_ID + ":" + name + "/quads", noDepth
+                ? MaLiLibPipelines.POSITION_COLOR_TRANSLUCENT_NO_DEPTH_NO_CULL
+                : MaLiLibPipelines.POSITION_COLOR_TRANSLUCENT_LEQUAL_DEPTH_OFFSET_2)) {
+            BufferBuilder buffer = quads.getBuilder();
+            for (Map.Entry<BlockPos, ContainerStatus> entry : statuses.entrySet()) {
+                Color4f color = colorFor(entry.getValue());
+                if (color != null && include.test(entry.getKey())) {
+                    RenderUtils.drawBlockBoundingBoxSidesBatchedQuads(entry.getKey(), camera, color, EXPAND, buffer);
+                }
+            }
+            draw(quads, buffer);
+        }
+
+        try (RenderContext lines = new RenderContext(() -> Reference.MOD_ID + ":" + name + "/lines", noDepth
+                ? MaLiLibPipelines.DEBUG_LINES_MASA_SIMPLE_NO_DEPTH_NO_CULL
+                : MaLiLibPipelines.DEBUG_LINES_MASA_SIMPLE_LEQUAL_DEPTH)) {
+            BufferBuilder buffer = lines.getBuilder();
+            for (Map.Entry<BlockPos, ContainerStatus> entry : statuses.entrySet()) {
+                Color4f color = colorFor(entry.getValue());
+                if (color != null && include.test(entry.getKey())) {
+                    Color4f outline = new Color4f(color.r, color.g, color.b, 0.9f);
+                    RenderUtils.drawBlockBoundingBoxOutlinesBatchedLinesSimple(entry.getKey(), outline, EXPAND, LINE_WIDTH, buffer);
+                }
+            }
+            draw(lines, buffer);
         }
     }
 

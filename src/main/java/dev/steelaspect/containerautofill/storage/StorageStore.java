@@ -184,23 +184,12 @@ public final class StorageStore {
         save();
     }
 
-    public static String exportGroup(Group group) {
-        return GSON.toJson(group);
-    }
-
-    public static Group importGroup(String json) {
-        try {
-            Group imported = GSON.fromJson(json, Group.class);
-            if (imported == null || imported.containers == null) return null;
-            Group group = createGroup(imported.name);
-            for (Entry entry : imported.containers) {
-                if (entry != null && entry.dimension != null) group.containers.add(entry);
-            }
-            save();
-            return group;
-        } catch (JsonParseException | IllegalStateException e) {
-            return null;
-        }
+    /** Adds a new group holding these containers (a shared group someone added) and makes it active. */
+    public static Group addGroup(String name, List<Entry> containers) {
+        Group group = createGroup(name);
+        group.containers.addAll(containers);
+        save();
+        return group;
     }
 
     // ---------------------------------------------------------------- containers (active group)

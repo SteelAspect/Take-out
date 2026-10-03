@@ -688,6 +688,43 @@ public class ContainerAutoFillClientGameTest implements FabricClientGameTest {
         check("H11 container the schematic expects empty, holding items, highlighted WRONG",
                 statuses.get(emptyChest) == ContainerStatus.WRONG, "empty=" + statuses.get(emptyChest));
         world.getServer().runOnServer(server -> ((Inventory) server.getOverworld().getBlockEntity(emptyChest)).clear());
+
+        testHighlightThroughLiquids(context, world);
+    }
+
+    /** H12-H13: a box behind water is drawn on top; a box behind a solid block isn't. */
+    private void testHighlightThroughLiquids(ClientGameTestContext context, TestSingleplayerContext world) {
+        // Frozen ticks keep the water where it's put; the highlight runs on the client either way.
+        world.getServer().runCommand("tick freeze");
+        List<BlockPos> pool = List.of(correctChest.add(0, 0, 1), correctChest.add(0, 0, 2), correctChest.add(0, 1, 1), correctChest.add(0, 1, 2));
+        world.getServer().runOnServer(server -> {
+            for (BlockPos p : pool) server.getOverworld().setBlockState(p, Blocks.WATER.getDefaultState());
+        });
+        float pitch = (float) Math.toDegrees(Math.atan2(1.62 - 0.5, 3.0));
+        world.getServer().runCommand(String.format(java.util.Locale.ROOT, "tp @p %.1f %d %.1f 180 %.2f",
+                correctChest.getX() + 0.5, correctChest.getY(), correctChest.getZ() + 3.5, pitch));
+        try {
+            context.waitFor(client -> ContainerHighlighter.behindLiquid().contains(correctChest), 60);
+        } catch (Throwable ignored) {
+        }
+        check("H12 container behind water is drawn through it", ContainerHighlighter.behindLiquid().contains(correctChest),
+                "behindLiquid=" + ContainerHighlighter.behindLiquid());
+        context.runOnClient(client -> client.inGameHud.getChatHud().clear(false));
+        LOG.info("Highlight through water screenshot: {}", context.takeScreenshot("containerautofill-highlight-water"));
+
+        world.getServer().runOnServer(server -> {
+            for (BlockPos p : pool) server.getOverworld().setBlockState(p, Blocks.STONE.getDefaultState());
+        });
+        try {
+            context.waitFor(client -> !ContainerHighlighter.behindLiquid().contains(correctChest), 60);
+        } catch (Throwable ignored) {
+        }
+        check("H13 container behind a solid block is not drawn through it", !ContainerHighlighter.behindLiquid().contains(correctChest),
+                "behindLiquid=" + ContainerHighlighter.behindLiquid());
+        world.getServer().runOnServer(server -> {
+            for (BlockPos p : pool) server.getOverworld().setBlockState(p, Blocks.AIR.getDefaultState());
+        });
+        world.getServer().runCommand("tick unfreeze");
     }
 
     private void testHighlightUpdatesAfterFill(ClientGameTestContext context, TestSingleplayerContext world) {

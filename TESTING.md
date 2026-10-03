@@ -70,8 +70,9 @@
 | H7–H8 | Highlight coverage | Double chests, furnace, brewing stand, copper, recoloured shulker (crafter skipped) | All highlighted |
 | H9 | Highlight live update | Fill an empty chest | Turns green within a second |
 | H10–H11 | Container meant to be empty | Schematic chest with no items; then put an item in it | No box while empty; red once it holds an item |
+| H12–H13 | Through liquids | Pool of water between you and a highlighted chest (ticks frozen so it stays put); then stone instead of water | Behind water: drawn on top (screenshot); behind stone: not |
 
-| S1–S5 | Linking | `H` on a chest; box select two corners; mark dump; link a chest 160 blocks away (force-loaded) | Linked, dump flag set, far contents read, saved to `config/containerautofill/storage/` |
+| S1–S5 | Linking | `H` on a chest; box select two corners; mark dump; link a chest 160 blocks away (force-loaded) | Linked, dump flag set, far contents read, saved to `config/containerautofill/storage/`. Box select adds to the selected group: the chest linked with `H` stays, no new group |
 | S6 | Storage menu | Press `Y` | Menu opens (All Items / Containers / Groups) |
 | S7 | Remote take | Take 10 emeralds from the chest 160 blocks away | Player +10, chest −10 |
 | S8 | Pick block from storage | Middle-click a gold block you only have in a linked chest | Gold block in the main hand |
@@ -90,7 +91,8 @@
 | K9–K10 | Totem not replaced | Drop a hotbar totem with Q; Restock Totems off and a totem pops | Slot stays empty, box unchanged |
 | K6 | Restock off | Restock off, offhand 5 fireworks, restock box | Offhand stays 5 |
 | S9 | Dump | Dump key with cobblestone/dirt in main inventory, torches in hotbar | Main inventory moved into the dump chest, hotbar kept |
-| S10–S12 | Look At, groups | Look At iron; new group; switch back; share + import | Marked; group empty then restored; import copies all entries |
+| S10–S11 | Look At, groups | Look At iron; new group; switch back | Marked; group empty then restored |
+| G1–G6 | Shared groups | Share a group; Add it from *Shared on this server*; Share it again; Remove | Listed with owner and size; Add creates a copy (new name, same containers, dump flags kept) and switches to it; sharing again updates instead of duplicating; saved in `<world>/data/containerautofill_shared_groups.json`; Remove empties the list |
 
 | I1–I5 | Instant fill (`V`) | Double chest: stone loose, iron only in an inventory shulker, emerald/gold/named diamond only in linked chests (one 160 blocks away) | No screen opens; both halves exact; items really moved from shulker and far chest; nothing missing |
 | I6–I7 | Instant fill, wrong items | Hopper with dirt where glass is expected; TNT unavailable | Clear Wrong off: dirt kept, wrong + missing reported. On: dirt to inventory, glass filled |
@@ -104,7 +106,7 @@
 
 | # | Case | Steps | Expected |
 |---|---|---|---|
-| D1 | Only allowed mods | Launch with Fabric API, Litematica, MaLiLib, this mod | Game reaches the title screen; `latest.log` shows `containerautofill 1.2.0` (Cytra Container) loaded |
+| D1 | Only allowed mods | Launch with Fabric API, Litematica, MaLiLib, this mod | Game reaches the title screen; `latest.log` shows `containerautofill 1.3.1` (Cytra Container) loaded |
 | D2 | Litematica missing on the client | Remove Litematica from `mods/` | The game stops at startup with *Cytra Container needs Litematica and MaLiLib on the client: litematica >=0.26.16 is missing* (the same jar on a dedicated server doesn't need them) |
 | D3 | Original mods installed alongside | Add TakeItOut or Litematica-Container-Filler | Fabric refuses to start with a clear "breaks" message naming the conflicting mod |
 
@@ -133,3 +135,5 @@ Record each run here (date, version, environment, pass/fail per case).
 | 2026-10-03 | 1.1.2 (Cytra Container) | Local desktop, client gametests with a display (no Xvfb) | Containers the schematic expects empty: H10 no colour while empty, H11 red once an item is put in. Full suite 54/54 + 50/50 |
 | 2026-10-03 | 1.1.3 (Cytra Container) | Local desktop, client gametests with a display (no Xvfb) | Enable TakeItOut switch: C27–C29 (pick block pulls nothing while off, pulls again when back on), R6 (no Hotbar Refill while off). Crafter checks skipped (T9, crafter in H8). Full suite 55/55 + 51/51 |
 | 2026-10-03 | 1.2.0 (Cytra Container) | Local desktop, client gametests with a display (no Xvfb) | Shulker boxes in linked containers: N1–N7 (menu count + take, pick block into the hand, loose before boxed, instant fill from a box and not with Use Shulker Boxes off, boxes stay put). Full suite 55/55 + 59/59 |
+| 2026-10-03 | 1.3.0 (Cytra Container) | Local desktop, client gametests with a display (no Xvfb) | Box select adds to the selected group (S2). Shared groups G1–G6 (share, listed with owner/size, Add copies, re-share updates, saved in the world folder, Remove); Groups tab screenshot with a shared group checked. Full suite 55/55 + 65/65 |
+| 2026-10-03 | 1.3.1 (Cytra Container) | Local desktop, client gametests with a display (no Xvfb) | Highlight through liquids: H12 (behind water: drawn on top, screenshot checked), H13 (behind stone: not). Full suite 57/57 + 65/65 |

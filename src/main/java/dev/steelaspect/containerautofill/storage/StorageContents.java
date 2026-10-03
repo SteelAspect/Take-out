@@ -65,9 +65,11 @@ public final class StorageContents {
     }
 
     public static void tick() {
-        if (!OUTBOX.isEmpty() && isSupported()) {
-            ClientPlayNetworking.send(OUTBOX.poll());
-        }
+        if (OUTBOX.isEmpty() || !isSupported()) return;
+        ClientPlayNetworking.send(OUTBOX.poll());
+        // A long queue (thousands of linked containers plus the highlight) goes out two batches a tick,
+        // still well inside the server's read budget.
+        if (OUTBOX.size() > 20) ClientPlayNetworking.send(OUTBOX.poll());
     }
 
     public static void onContents(StoragePayloads.Contents payload) {
@@ -93,6 +95,16 @@ public final class StorageContents {
                 OUTBOX.add(new StoragePayloads.Query(dimension, batch));
             }
         });
+    }
+
+    /** Like {@link #request}, but ahead of anything already queued (the highlight shouldn't wait for a linked refresh). */
+    public static void requestFirst(Identifier dimension, List<BlockPos> positions) {
+        if (!isSupported() || positions.isEmpty()) return;
+        List<StoragePayloads.Query> batches = new ArrayList<>();
+        for (int i = 0; i < positions.size(); i += StoragePayloadsLimits.QUERY_BATCH) {
+            batches.add(new StoragePayloads.Query(dimension, List.copyOf(positions.subList(i, Math.min(positions.size(), i + StoragePayloadsLimits.QUERY_BATCH)))));
+        }
+        for (int i = batches.size() - 1; i >= 0; i--) OUTBOX.addFirst(batches.get(i));
     }
 
     public static void requestOne(Identifier dimension, BlockPos pos) {

@@ -30,7 +30,9 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import dev.steelaspect.containerautofill.network.FillPayloads;
 import dev.steelaspect.containerautofill.filler.InstantFill;
+import dev.steelaspect.containerautofill.network.SharedGroupPayloads;
 import dev.steelaspect.containerautofill.network.StoragePayloads;
+import dev.steelaspect.containerautofill.storage.SharedGroups;
 import dev.steelaspect.containerautofill.storage.StorageActions;
 import dev.steelaspect.containerautofill.storage.StorageContents;
 import dev.steelaspect.containerautofill.storage.StorageRetriever;
@@ -61,6 +63,8 @@ public class ContainerAutoFillClient implements ClientModInitializer {
             }
         });
         ClientPlayNetworking.registerGlobalReceiver(FillPayloads.Result.ID, (payload, context) -> InstantFill.onResult(context.client(), payload));
+        ClientPlayNetworking.registerGlobalReceiver(SharedGroupPayloads.GroupList.ID, (payload, context) -> SharedGroups.onList(context.client(), payload));
+        ClientPlayNetworking.registerGlobalReceiver(SharedGroupPayloads.GroupData.ID, (payload, context) -> SharedGroups.onData(context.client(), payload));
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> StorageStore.load(client));
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
             AutoFillController.reset();
@@ -73,6 +77,7 @@ public class ContainerAutoFillClient implements ClientModInitializer {
             HotbarRefill.reset();
             Restock.reset();
             StorageContents.clear();
+            SharedGroups.reset();
             StorageStore.unload();
         });
     }

@@ -136,9 +136,6 @@ public final class StorageActions {
         }
         BlockPos a = boxCorner;
         boxCorner = null;
-        if (Configs.BOX_SELECT_CREATES_NEW_GROUP.getBooleanValue()) {
-            StorageStore.createGroup("Box");
-        }
         Identifier dim = dimension(client);
         int added = 0;
         for (BlockPos p : BlockPos.iterate(a, pos)) {

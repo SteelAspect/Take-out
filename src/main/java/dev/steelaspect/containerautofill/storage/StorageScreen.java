@@ -8,6 +8,7 @@ package dev.steelaspect.containerautofill.storage;
 import dev.steelaspect.containerautofill.config.Configs;
 import dev.steelaspect.containerautofill.config.GuiConfigs;
 import dev.steelaspect.containerautofill.filler.ItemMatcher;
+import dev.steelaspect.containerautofill.network.SharedGroupPayloads;
 import fi.dy.masa.malilib.gui.GuiBase;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.Click;
@@ -58,6 +59,7 @@ public class StorageScreen extends Screen {
 
     public static void open(MinecraftClient client) {
         StorageActions.refreshAll();
+        if (tab == Tab.GROUPS) SharedGroups.requestList();
         client.setScreen(new StorageScreen(client.currentScreen));
     }
 
@@ -119,6 +121,7 @@ public class StorageScreen extends Screen {
 
     private void switchTab(Tab next) {
         tab = next;
+        if (next == Tab.GROUPS) SharedGroups.requestList();
         this.confirmDeleteAll = false;
         this.clearAndInit();
     }
@@ -369,38 +372,41 @@ public class StorageScreen extends Screen {
 
     // ---------------------------------------------------------------- Groups
 
+    /** The server's shared-group list changed (or a shared group was added): redraw the Groups tab. */
+    void onSharedGroupsChanged() {
+        if (tab == Tab.GROUPS) this.clearAndInit();
+    }
+
     private void initGroups() {
         int left = this.width / 2 - panelWidth() / 2;
         int right = left + panelWidth();
-        this.groupName = new TextFieldWidget(this.textRenderer, right - 330, 40, 140, 18, Text.translatable("containerautofill.storage.group_name"));
+        this.groupName = new TextFieldWidget(this.textRenderer, right - 236, 40, 140, 18, Text.translatable("containerautofill.storage.group_name"));
         this.groupName.setPlaceholder(Text.translatable("containerautofill.storage.group_name").formatted(Formatting.DARK_GRAY));
         this.addDrawableChild(this.groupName);
         this.addDrawableChild(ButtonWidget.builder(Text.translatable("containerautofill.storage.new_group"), b -> {
             StorageStore.createGroup(this.groupName.getText());
             this.clearAndInit();
-        }).dimensions(right - 186, 40, 90, 18).build());
-        this.addDrawableChild(ButtonWidget.builder(Text.translatable("containerautofill.storage.import"), b -> {
-            StorageStore.Group imported = StorageStore.importGroup(this.client.keyboard.getClipboard());
-            if (this.client.player != null) {
-                this.client.player.sendMessage(imported == null ? Text.translatable("containerautofill.message.storage_import_failed")
-                        : Text.translatable("containerautofill.message.storage_imported", imported.name, imported.containers.size()), true);
-            }
-            StorageActions.refreshAll();
-            this.clearAndInit();
         }).dimensions(right - 92, 40, 92, 18).build());
 
         GroupList list = new GroupList(this.client, panelWidth(), this.height - 36 - 64, 64);
         list.setX(left);
+        list.add(new HeaderRow(Text.translatable("containerautofill.storage.my_groups")));
         for (StorageStore.Group group : StorageStore.groups()) list.add(new GroupRow(group));
+        list.add(new HeaderRow(Text.translatable(SharedGroups.isSupported()
+                ? "containerautofill.storage.shared_groups" : "containerautofill.storage.shared_unsupported")));
+        if (SharedGroups.isSupported() && SharedGroups.list().isEmpty()) {
+            list.add(new HeaderRow(Text.translatable("containerautofill.storage.shared_none").formatted(Formatting.GRAY)));
+        }
+        for (SharedGroupPayloads.Summary summary : SharedGroups.list()) list.add(new SharedRow(summary));
         this.addDrawableChild(list);
     }
 
-    private static final class GroupList extends ElementListWidget<GroupRow> {
+    private static final class GroupList extends ElementListWidget<Row> {
         GroupList(MinecraftClient client, int width, int height, int y) {
             super(client, width, height, y, 24);
         }
 
-        void add(GroupRow row) {
+        void add(Row row) {
             this.addEntry(row);
         }
 
@@ -410,7 +416,33 @@ public class StorageScreen extends Screen {
         }
     }
 
-    private final class GroupRow extends ElementListWidget.Entry<GroupRow> {
+    private abstract static class Row extends ElementListWidget.Entry<Row> {
+    }
+
+    private final class HeaderRow extends Row {
+        private final Text text;
+
+        HeaderRow(Text text) {
+            this.text = text;
+        }
+
+        @Override
+        public void render(DrawContext context, int mouseX, int mouseY, boolean hovered, float deltaTicks) {
+            context.drawTextWithShadow(StorageScreen.this.textRenderer, this.text, this.getContentX() + 2, this.getContentY() + 8, GOLD);
+        }
+
+        @Override
+        public List<? extends Element> children() {
+            return List.of();
+        }
+
+        @Override
+        public List<? extends Selectable> selectableChildren() {
+            return List.of();
+        }
+    }
+
+    private final class GroupRow extends Row {
         private final StorageStore.Group group;
         private final ButtonWidget use;
         private final ButtonWidget share;
@@ -425,12 +457,10 @@ public class StorageScreen extends Screen {
                 StorageScreen.this.clearAndInit();
             }).dimensions(0, 0, 50, 20).build();
             this.use.active = !active;
-            this.share = ButtonWidget.builder(Text.translatable("containerautofill.storage.share"), b -> {
-                StorageScreen.this.client.keyboard.setClipboard(StorageStore.exportGroup(group));
-                if (StorageScreen.this.client.player != null) {
-                    StorageScreen.this.client.player.sendMessage(Text.translatable("containerautofill.message.storage_shared", group.name), true);
-                }
-            }).dimensions(0, 0, 50, 20).build();
+            boolean shared = SharedGroups.sharedByMe(group.name) != null;
+            this.share = ButtonWidget.builder(Text.translatable(shared ? "containerautofill.storage.update_share" : "containerautofill.storage.share"),
+                    b -> SharedGroups.share(StorageScreen.this.client, group)).dimensions(0, 0, 50, 20).build();
+            this.share.active = SharedGroups.isSupported();
             this.delete = ButtonWidget.builder(Text.translatable("containerautofill.storage.delete"), b -> {
                 StorageStore.deleteGroup(group.name);
                 StorageScreen.this.clearAndInit();
@@ -447,7 +477,8 @@ public class StorageScreen extends Screen {
                 context.fill(x, y - 1, x + this.getContentWidth(), y + 21, 0x6022A0B0);
                 context.fill(x, y - 1, x + 2, y + 21, 0xFF22D0E0);
             }
-            String label = (active ? "(active) " : "") + this.group.name + "  (" + this.group.containers.size() + ")";
+            String label = (active ? "(active) " : "") + this.group.name + "  (" + this.group.containers.size() + ")"
+                    + (SharedGroups.sharedByMe(this.group.name) != null ? "  - shared" : "");
             context.drawTextWithShadow(StorageScreen.this.textRenderer, label, x + 6, y + 6, active ? ACCENT : TEXT);
             int right = x + this.getContentWidth();
             this.delete.setPosition(right - 52, y);
@@ -466,6 +497,46 @@ public class StorageScreen extends Screen {
         @Override
         public List<? extends Selectable> selectableChildren() {
             return List.of(this.use, this.share, this.delete);
+        }
+    }
+
+    /** A group someone shared on the server: Add puts a copy in your groups; its owner (or an op) can remove it. */
+    private final class SharedRow extends Row {
+        private final SharedGroupPayloads.Summary summary;
+        private final ButtonWidget add;
+        private final ButtonWidget remove;
+
+        SharedRow(SharedGroupPayloads.Summary summary) {
+            this.summary = summary;
+            this.add = ButtonWidget.builder(Text.translatable("containerautofill.storage.add"), b -> SharedGroups.add(summary.groupId()))
+                    .dimensions(0, 0, 50, 20).build();
+            this.remove = ButtonWidget.builder(Text.translatable("containerautofill.storage.unshare"), b -> SharedGroups.unshare(summary.groupId()))
+                    .dimensions(0, 0, 50, 20).build();
+            this.remove.active = summary.removable();
+        }
+
+        @Override
+        public void render(DrawContext context, int mouseX, int mouseY, boolean hovered, float deltaTicks) {
+            int x = this.getContentX();
+            int y = this.getContentY();
+            Text label = Text.translatable("containerautofill.storage.shared_row", this.summary.name(), this.summary.count(),
+                    this.summary.mine() ? Text.translatable("containerautofill.storage.shared_you") : Text.literal(this.summary.owner()));
+            context.drawTextWithShadow(StorageScreen.this.textRenderer, label, x + 6, y + 6, TEXT);
+            int right = x + this.getContentWidth();
+            this.remove.setPosition(right - 52, y);
+            this.add.setPosition(right - 104, y);
+            this.add.render(context, mouseX, mouseY, deltaTicks);
+            this.remove.render(context, mouseX, mouseY, deltaTicks);
+        }
+
+        @Override
+        public List<? extends Element> children() {
+            return List.of(this.add, this.remove);
+        }
+
+        @Override
+        public List<? extends Selectable> selectableChildren() {
+            return List.of(this.add, this.remove);
         }
     }
 }
