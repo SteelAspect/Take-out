@@ -167,7 +167,8 @@ public final class AutoFillController {
             boolean allCorrect = true;
             for (SchematicContainerReader.Part part : halves.parts()) {
                 seen.add(part.pos());
-                if (statuses.get(part.pos()) != ContainerStatus.CORRECT) allCorrect = false;
+                ContainerStatus status = statuses.get(part.pos());
+                if (status != ContainerStatus.CORRECT && status != ContainerStatus.NOTHING_EXPECTED) allCorrect = false;
             }
             if (!allCorrect) toFill.add(halves);
         }

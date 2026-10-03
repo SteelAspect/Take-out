@@ -133,6 +133,7 @@ public final class HighlightRenderer implements IRenderer {
     public static Color4f colorFor(ContainerStatus status) {
         return switch (status) {
             case CORRECT -> Configs.HIGHLIGHT_SHOW_CORRECT.getBooleanValue() ? Configs.COLOR_CORRECT.getColor() : null;
+            case NOTHING_EXPECTED -> null;
             case EMPTY -> Configs.COLOR_EMPTY.getColor();
             case PARTIAL -> Configs.COLOR_PARTIAL.getColor();
             case WRONG -> Configs.COLOR_WRONG.getColor();

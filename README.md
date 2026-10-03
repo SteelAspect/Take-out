@@ -1,6 +1,6 @@
 # Cytra Container
 
-A Fabric mod for **Minecraft Java 1.21.11** by **steelaspect**. Version **1.1.1**, one jar (`cytra-container-1.1.1.jar`) for the client and, optionally, the server.
+A Fabric mod for **Minecraft Java 1.21.11** by **steelaspect**. Version **1.1.2**, one jar (`cytra-container-1.1.2.jar`) for the client and, optionally, the server.
 
 It brings together the behaviour of two mods, without needing either of them installed:
 
@@ -58,6 +58,7 @@ Placed schematic containers within *Highlight Range* get a see-through coloured 
 - In singleplayer and LAN the highlight is always live.
 - **No need to open containers:** the colours come from the server reading each container's contents, in singleplayer/LAN and on Fabric servers that also run this mod. On other servers, a container's colour is known once you've opened it (it's remembered afterwards), or live with **Servux** and Litematica's *entityDataSync* on.
 - A container whose block differs from the schematic (e.g. a barrel instead of a chest) isn't highlighted.
+- A container the schematic expects to be empty gets no box while it is empty. It turns red if something is put in it.
 - Toggle the highlight with *Highlight Containers*, which has an optional hotkey. Colours, range, see-through mode and hiding green/grey boxes are all configurable.
 
 ### 3. Fill looked-at container (`V`): instant

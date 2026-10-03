@@ -123,6 +123,8 @@ public final class ContainerHighlighter {
             if (count < entry.getValue().getCount()) missing = true;
             if (count > 0) anyPresent = true;
         }
+        // Expected empty and nothing wrong in it (wrong items returned WRONG above).
+        if (expected.isEmpty()) return ContainerStatus.NOTHING_EXPECTED;
         if (!missing) return ContainerStatus.CORRECT;
         return anyPresent ? ContainerStatus.PARTIAL : ContainerStatus.EMPTY;
     }

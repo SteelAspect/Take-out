@@ -9,6 +9,8 @@ package dev.steelaspect.containerautofill.highlight;
 public enum ContainerStatus {
     /** Every slot holds exactly what the schematic expects. */
     CORRECT,
+    /** The schematic expects it to be empty, and it is. Never coloured. */
+    NOTHING_EXPECTED,
     /** Nothing in it yet, but the schematic expects items. */
     EMPTY,
     /** Some expected items are missing; nothing wrong is in it. */

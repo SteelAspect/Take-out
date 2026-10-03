@@ -10,6 +10,7 @@ import dev.steelaspect.containerautofill.filler.AutoFillController;
 import dev.steelaspect.containerautofill.filler.FillResult;
 import dev.steelaspect.containerautofill.highlight.ContainerHighlighter;
 import dev.steelaspect.containerautofill.highlight.ContainerStatus;
+import dev.steelaspect.containerautofill.highlight.HighlightRenderer;
 import dev.steelaspect.containerautofill.takeitout.GetStackPayload;
 import dev.steelaspect.containerautofill.takeitout.ShulkerRetriever;
 import dev.steelaspect.containerautofill.takeitout.ShulkerStackServerHandler;
@@ -76,7 +77,7 @@ public class ContainerAutoFillClientGameTest implements FabricClientGameTest {
     private BlockPos single, doubleLeft, doubleRight, hopper, barrel, dispenser, shulkerBox, mismatch, lookFill, lapisSpot, outside, emerald;
     // Second row: more container types, and highlight-only containers.
     private BlockPos furnace, smoker, blastFurnace, brewingStand, dropper, trappedLeft, trappedRight, copperLeft, copperRight,
-            recoloredShulker, crafter, partialChest, correctChest;
+            recoloredShulker, crafter, partialChest, correctChest, emptyChest;
 
     @Override
     public void runTest(ClientGameTestContext context) {
@@ -179,6 +180,7 @@ public class ContainerAutoFillClientGameTest implements FabricClientGameTest {
         crafter = row2.add(18, 0, 0);
         partialChest = row2.add(20, 0, 0);
         correctChest = row2.add(22, 0, 0);
+        emptyChest = row2.add(24, 0, 0);
 
         world.getServer().runOnServer(server -> {
             ServerWorld w = server.getOverworld();
@@ -232,6 +234,7 @@ public class ContainerAutoFillClientGameTest implements FabricClientGameTest {
             w.setBlockState(crafter, Blocks.CRAFTER.getDefaultState());
             w.setBlockState(partialChest, Blocks.CHEST.getDefaultState());
             w.setBlockState(correctChest, Blocks.CHEST.getDefaultState());
+            w.setBlockState(emptyChest, Blocks.CHEST.getDefaultState());
 
             fill(w, furnace, Map.of(1, stack(Items.COAL, 4), 2, stack(Items.IRON_INGOT, 3)));
             fill(w, smoker, Map.of(1, stack(Items.CHARCOAL, 2)));
@@ -253,7 +256,7 @@ public class ContainerAutoFillClientGameTest implements FabricClientGameTest {
             // Save the area as a schematic (read from the server world so container contents are included).
             AreaSelection area = new AreaSelection();
             area.addSubRegionBox(new Box(base, lapisSpot, "main"), false);
-            area.addSubRegionBox(new Box(furnace, correctChest, "row2"), false);
+            area.addSubRegionBox(new Box(furnace, emptyChest, "row2"), false);
             area.setExplicitOrigin(base);
             LitematicaSchematic schematic = LitematicaSchematic.createFromWorld(
                     w, area, new LitematicaSchematic.SchematicSaveInfo(false, true), "steelaspect", msg -> LOG.warn("schematic: {}", msg));
@@ -634,6 +637,9 @@ public class ContainerAutoFillClientGameTest implements FabricClientGameTest {
         check("H8 other container types highlighted (furnace, brewing stand, crafter, copper, recoloured shulker)",
                 statuses.containsKey(furnace) && statuses.containsKey(brewingStand) && statuses.containsKey(crafter)
                         && statuses.containsKey(copperLeft) && statuses.containsKey(recoloredShulker), "statuses=" + statuses.size());
+        check("H10 container the schematic expects empty, and is, has no colour",
+                statuses.get(emptyChest) == ContainerStatus.NOTHING_EXPECTED && HighlightRenderer.colorFor(ContainerStatus.NOTHING_EXPECTED) == null,
+                "empty=" + statuses.get(emptyChest));
 
         // Overview screenshot of both rows (check visually: coloured boxes on the containers).
         world.getServer().runCommand(String.format(java.util.Locale.ROOT, "tp @p %.1f %d %.1f 0 35",
@@ -641,6 +647,12 @@ public class ContainerAutoFillClientGameTest implements FabricClientGameTest {
         context.waitTicks(20);
         java.nio.file.Path shot = context.takeScreenshot("containerautofill-highlight");
         LOG.info("Highlight screenshot: {}", shot);
+
+        world.getServer().runOnServer(server -> fill(server.getOverworld(), emptyChest, Map.of(0, stack(Items.STONE, 1))));
+        statuses = waitForStatuses(context, m -> m.get(emptyChest) == ContainerStatus.WRONG);
+        check("H11 container the schematic expects empty, holding items, highlighted WRONG",
+                statuses.get(emptyChest) == ContainerStatus.WRONG, "empty=" + statuses.get(emptyChest));
+        world.getServer().runOnServer(server -> ((Inventory) server.getOverworld().getBlockEntity(emptyChest)).clear());
     }
 
     private void testHighlightUpdatesAfterFill(ClientGameTestContext context, TestSingleplayerContext world) {

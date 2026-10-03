@@ -68,6 +68,7 @@
 | H5–H6 | Highlight filtering | Barrel where schematic has a chest; non-container schematic block | Not highlighted |
 | H7–H8 | Highlight coverage | Double chests, furnace, brewing stand, crafter, copper, recoloured shulker | All highlighted |
 | H9 | Highlight live update | Fill an empty chest | Turns green within a second |
+| H10–H11 | Container meant to be empty | Schematic chest with no items; then put an item in it | No box while empty; red once it holds an item |
 
 | S1–S5 | Linking | `H` on a chest; box select two corners; mark dump; link a chest 160 blocks away (force-loaded) | Linked, dump flag set, far contents read, saved to `config/containerautofill/storage/` |
 | S6 | Storage menu | Press `Y` | Menu opens (All Items / Containers / Groups) |
@@ -100,7 +101,7 @@
 
 | # | Case | Steps | Expected |
 |---|---|---|---|
-| D1 | Only allowed mods | Launch with Fabric API, Litematica, MaLiLib, this mod | Game reaches the title screen; `latest.log` shows `containerautofill 1.1.1` (Cytra Container) loaded |
+| D1 | Only allowed mods | Launch with Fabric API, Litematica, MaLiLib, this mod | Game reaches the title screen; `latest.log` shows `containerautofill 1.1.2` (Cytra Container) loaded |
 | D2 | Litematica missing on the client | Remove Litematica from `mods/` | The game stops at startup with *Cytra Container needs Litematica and MaLiLib on the client: litematica >=0.26.16 is missing* (the same jar on a dedicated server doesn't need them) |
 | D3 | Original mods installed alongside | Add TakeItOut or Litematica-Container-Filler | Fabric refuses to start with a clear "breaks" message naming the conflicting mod |
 
@@ -126,3 +127,4 @@ Record each run here (date, version, environment, pass/fail per case).
 | 2026-10-02 | 1.0.0+1.21.11 | Single jar | A8 pass: `runServer` reaches Done with only containerautofill + Fabric API (Litematica/MaLiLib skipped as client-only). D2 pass: client without Litematica stops with "Container Auto Fill needs Litematica and MaLiLib on the client: litematica [>=0.26.16] is missing". Full suite 53/53 + 50/50 (totem K7–K10; popped totem replaced in 1 tick) |
 | 2026-10-02 | 1.1.1 (Cytra Container) | Cloud container, client gametests under Xvfb | Renamed build `cytra-container-1.1.1.jar`: full suite 53/53 + 50/50, config title "Cytra Container - Configs" |
 | 2026-10-03 | 1.1.1 (Cytra Container) | Cloud container, client gametests under Xvfb | Auto Take Out removed: C22 nothing pulled after looking at a schematic block for 2 s (and pressing R); C21 Litematica pick still pulls. Full suite 52/52 + 50/50 |
+| 2026-10-03 | 1.1.2 (Cytra Container) | Local desktop, client gametests with a display (no Xvfb) | Containers the schematic expects empty: H10 no colour while empty, H11 red once an item is put in. Full suite 54/54 + 50/50 |
