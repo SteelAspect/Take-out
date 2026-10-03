@@ -18,7 +18,7 @@ import java.util.List;
 import java.util.function.Predicate;
 
 /**
- * Pulls a missing item out of linked storage for auto-fill, pick block and auto take-out. Requests for
+ * Pulls a missing item out of linked storage for auto-fill, pick block and easy place. Requests for
  * different items can be in flight together. Each resolves when the server answers it
  * ({@link StoragePayloads.Taken}, sent after the inventory sync, so the item is already there), or after a
  * ping-based timeout. Inventory counts aren't used: a late server correction can briefly show one item

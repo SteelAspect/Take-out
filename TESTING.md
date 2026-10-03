@@ -50,7 +50,7 @@
 | C19 | Fill looked-at (LCF feature) | Look at an empty schematic chest and press `V` | It opens, fills and closes. |
 | C20 | Pick block from shulker (TakeItOut) | Survival, stone only inside a shulker box: middle-click real stone | Stone ends up in your hand. |
 | C21 | Schematic pick / easy place | Litematica easy place on, stone only in a shulker: use on a schematic stone block | The first use requests the stone, then easy place places it. |
-| C22 | Auto Take Out (R) | Press `R`, look at a schematic block you only have in a shulker | Chat shows `Auto Take Out is ON` and the block is pulled into your hand. |
+| C22 | No pull on look | Look at a schematic block you only have in a shulker (and press `R`) for 2 s | Nothing is pulled; a Litematica pick block (C21) then pulls it. |
 | C23 | Server without the handler | Fabric server without this mod, item only in a shulker | One chat warning that the server doesn't accept shulker requests. Only loose items are used and the rest is reported missing. No kicks. |
 | C24 | Stacked shulkers | Two identical shulker boxes stacked together contain the item | Warning `Stacked shulker boxes can't be taken from…`. Nothing requested. |
 | C25 | Inventory full | Fill every inventory slot, item only in a shulker | No request is sent. Chat notes that your inventory is full. |
@@ -125,3 +125,4 @@ Record each run here (date, version, environment, pass/fail per case).
 | 2026-10-02 | 1.0.0+1.21.11 | Cloud container, client gametests under Xvfb | Full suite 53/53 + 46/46 (Restock K1–K6 added; offhand restocked in 3 ticks with the rest of the mod off) |
 | 2026-10-02 | 1.0.0+1.21.11 | Single jar | A8 pass: `runServer` reaches Done with only containerautofill + Fabric API (Litematica/MaLiLib skipped as client-only). D2 pass: client without Litematica stops with "Container Auto Fill needs Litematica and MaLiLib on the client: litematica [>=0.26.16] is missing". Full suite 53/53 + 50/50 (totem K7–K10; popped totem replaced in 1 tick) |
 | 2026-10-02 | 1.1.1 (Cytra Container) | Cloud container, client gametests under Xvfb | Renamed build `cytra-container-1.1.1.jar`: full suite 53/53 + 50/50, config title "Cytra Container - Configs" |
+| 2026-10-03 | 1.1.1 (Cytra Container) | Cloud container, client gametests under Xvfb | Auto Take Out removed: C22 nothing pulled after looking at a schematic block for 2 s (and pressing R); C21 Litematica pick still pulls. Full suite 52/52 + 50/50 |

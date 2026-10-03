@@ -73,10 +73,6 @@ public final class InputHandler implements IKeybindProvider, IHotkeyCallback {
         if (!Configs.ENABLE_MOD.getBooleanValue() || client.player == null) {
             return false;
         }
-        if (key == Configs.AUTO_TAKE_OUT.getKeybind()) {
-            TakeItOutFeatures.toggleAutoTakeOut(client);
-            return true;
-        }
         if (key == Configs.SINGLE_ITEM_MODE.getKeybind() || key == Configs.LINKED_OUTLINES.getKeybind() || key == Configs.HOTBAR_REFILL.getKeybind()) {
             ConfigBooleanHotkeyed option = key == Configs.SINGLE_ITEM_MODE.getKeybind() ? Configs.SINGLE_ITEM_MODE
                     : key == Configs.LINKED_OUTLINES.getKeybind() ? Configs.LINKED_OUTLINES : Configs.HOTBAR_REFILL;

@@ -8,20 +8,12 @@ package dev.steelaspect.containerautofill.takeitout;
 import dev.steelaspect.containerautofill.config.Configs;
 import dev.steelaspect.containerautofill.storage.StorageRetriever;
 import fi.dy.masa.litematica.config.Hotkeys;
-import fi.dy.masa.litematica.materials.MaterialCache;
 import fi.dy.masa.litematica.util.EasyPlaceUtils;
-import fi.dy.masa.litematica.util.RayTraceUtils;
 import fi.dy.masa.litematica.util.WorldUtils;
-import fi.dy.masa.litematica.world.SchematicWorldHandler;
-import fi.dy.masa.litematica.world.WorldSchematic;
 import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.item.ItemStack;
-import net.minecraft.text.Text;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.hit.HitResult;
 import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Vec3d;
 
 import java.util.function.Predicate;
 
@@ -30,18 +22,14 @@ import java.util.function.Predicate;
  * <ul>
  *     <li>Pick block (vanilla middle click, and Litematica's schematic pick block / easy place) pulls the
  *     item out of a shulker box in the inventory when it isn't carried loose.</li>
- *     <li>"Auto Take Out" toggle (default R): while on, looking at a schematic block you don't carry
- *     pulls it from a shulker; right-clicking a schematic block outside easy place does a schematic
- *     pick block.</li>
+ *     <li>Nothing is pulled just by looking at a block: only easy place and pick block (plus hotbar
+ *     refill, restock and the fills) pull items.</li>
  * </ul>
  */
 public final class TakeItOutFeatures {
-    private static final double AUTO_LOOK_RANGE = 3.0;
-    private static final double RIGHT_CLICK_RANGE = 5.0;
     /** How long an easy place attempt that had to wait for an item stays eligible for the instant retry. */
     private static final int RETRY_WINDOW_TICKS = 100;
 
-    private static boolean useKeyWasDown;
     private static long ticks;
     /** Item an easy place attempt is waiting for; easy place runs again the moment it arrives. */
     private static ItemStack retryItem = ItemStack.EMPTY;
@@ -57,41 +45,9 @@ public final class TakeItOutFeatures {
         bufferItem = ItemStack.EMPTY;
     }
 
-    public static void toggleAutoTakeOut(MinecraftClient client) {
-        Configs.AUTO_TAKE_OUT.toggleBooleanValue();
-        if (client.player != null) {
-            String key = Configs.AUTO_TAKE_OUT.getBooleanValue() ? "containerautofill.message.auto_take_out_on" : "containerautofill.message.auto_take_out_off";
-            client.player.sendMessage(Text.translatable(key), false);
-        }
-    }
-
     public static void tick(MinecraftClient client) {
         ticks++;
-        boolean useDown = client.options.useKey.isPressed();
-        boolean useClicked = useDown && !useKeyWasDown;
-        useKeyWasDown = useDown;
         topUpBuffer(client);
-
-        if (!Configs.AUTO_TAKE_OUT.getBooleanValue()) return;
-        if (client.player == null || client.world == null || client.currentScreen != null) return;
-        if (client.player.isCreative() || !client.player.getAbilities().allowModifyWorld) return;
-
-        WorldSchematic schematic = SchematicWorldHandler.getSchematicWorld();
-        if (schematic == null) return;
-
-        BlockHitResult near = RayTraceUtils.traceToSchematicWorld(client.player, AUTO_LOOK_RANGE, true, true);
-        if (near != null && near.getType() == HitResult.Type.BLOCK && isMissingButInShulker(client, schematic, near.getBlockPos())) {
-            WorldUtils.doSchematicWorldPickBlock(true, client);
-            return;
-        }
-
-        if (useClicked && !fi.dy.masa.litematica.config.Configs.Generic.EASY_PLACE_MODE.getBooleanValue()) {
-            BlockHitResult hit = RayTraceUtils.traceToSchematicWorld(client.player, RIGHT_CLICK_RANGE, true, true);
-            if (hit != null && hit.getType() == HitResult.Type.BLOCK && !isBehindRealBlock(client, hit)
-                    && !schematic.getBlockState(hit.getBlockPos()).isAir()) {
-                WorldUtils.doSchematicWorldPickBlock(true, client);
-            }
-        }
     }
 
     /**
@@ -210,25 +166,6 @@ public final class TakeItOutFeatures {
         if (ShulkerRetriever.countInInventory(client.player.getInventory(), matcher) > 0) return;
         if (ShulkerRetriever.isWaitingFor(stack) || StorageRetriever.isWaitingFor(stack)) return;
         requestFromAnySource(client, stack, matcher);
-    }
-
-    private static boolean isMissingButInShulker(MinecraftClient client, WorldSchematic schematic, BlockPos pos) {
-        BlockState state = schematic.getBlockState(pos);
-        if (state.isAir()) return false;
-        ItemStack required = MaterialCache.getInstance().getRequiredBuildItemForState(state, schematic, pos);
-        if (required.isEmpty()) return false;
-
-        Predicate<ItemStack> matcher = s -> ItemStack.areItemsAndComponentsEqual(s, required);
-        if (ShulkerRetriever.countInInventory(client.player.getInventory(), matcher) > 0) return false;
-        return ShulkerRetriever.find(client.player.getInventory(), matcher) != null || StorageRetriever.hasItem(client, matcher);
-    }
-
-    /** True if a real block is in front of (or at) the schematic block being targeted. */
-    private static boolean isBehindRealBlock(MinecraftClient client, BlockHitResult schematicHit) {
-        if (!(client.crosshairTarget instanceof BlockHitResult worldHit) || worldHit.getType() != HitResult.Type.BLOCK) return false;
-        if (worldHit.getBlockPos().equals(schematicHit.getBlockPos())) return true;
-        Vec3d eyes = client.player.getEyePos();
-        return eyes.distanceTo(worldHit.getPos()) + 1.0e-6 < eyes.distanceTo(schematicHit.getPos());
     }
 
     /** Respects Litematica's "pickBlockableSlots" list (1-based, comma separated, ranges allowed). */

@@ -68,7 +68,7 @@ public final class StorageActions {
             DIRTY.clear();
             StorageContents.request(entries);
         }
-        // Keep the cache fresh while something needs it (menu open, auto-fill, auto take-out).
+        // Keep the cache fresh while something may pull from it (menu open, linked containers in use, auto-fill).
         if ((refreshQueued && !StorageContents.isRefreshing())
                 || (ticks - lastRefresh >= REFRESH_INTERVAL_TICKS && wantsRefresh(client))) {
             refreshAll();
@@ -77,7 +77,7 @@ public final class StorageActions {
 
     private static boolean wantsRefresh(MinecraftClient client) {
         return client.currentScreen instanceof StorageScreen
-                || Configs.AUTO_TAKE_OUT.getBooleanValue()
+                || (Configs.USE_LINKED_CONTAINERS.getBooleanValue() && StorageStore.linkedCount() > 0)
                 || dev.steelaspect.containerautofill.filler.AutoFillController.isRunning();
     }
 

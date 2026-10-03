@@ -104,7 +104,7 @@ public class ContainerAutoFillClientGameTest implements FabricClientGameTest {
             testLookFill(context, world);
             testScreenClosedMidFill(context, world);
             testVanillaPickFromShulker(context, world);
-            testAutoTakeOut(context, world);
+            testNoPullOnLook(context, world);
             testMoreContainerTypes(context, world);
         }
 
@@ -594,21 +594,23 @@ public class ContainerAutoFillClientGameTest implements FabricClientGameTest {
         }
     }
 
-    private void testAutoTakeOut(ClientGameTestContext context, TestSingleplayerContext world) {
+    private void testNoPullOnLook(ClientGameTestContext context, TestSingleplayerContext world) {
+        // Looking at a schematic block (and pressing R, the old Auto Take Out key) must not pull anything.
         setPlayerInventory(world, Map.of(9, shulkerWith(Items.BLUE_SHULKER_BOX, 0, stack(Items.LAPIS_BLOCK, 5))));
         lookAt(context, world, lapisSpot);
         context.getInput().pressKey(GLFW.GLFW_KEY_R);
-        context.waitTicks(2);
-        check("C22 R toggles Auto Take Out on", Configs.AUTO_TAKE_OUT.getBooleanValue(), "still off");
+        context.waitTicks(40);
+        check("C22 looking at a schematic block pulls nothing", context.computeOnClient(client -> !clientHas(client, Items.LAPIS_BLOCK)),
+                "lapis was pulled without pick block or easy place");
+
+        // A Litematica schematic pick block (what its pick key does) still pulls it from the shulker.
+        context.runOnClient(client -> fi.dy.masa.litematica.util.WorldUtils.doSchematicWorldPickBlock(true, client));
         try {
-            context.waitFor(client -> clientHas(client, Items.LAPIS_BLOCK), 200);
-            check("C21/C22 schematic block pulled from shulker (Litematica pick path)", true, "");
+            context.waitFor(client -> clientHas(client, Items.LAPIS_BLOCK), 100);
+            check("C21 Litematica schematic pick block pulls from a shulker", true, "");
         } catch (Throwable t) {
-            fail("C21/C22 schematic block pulled from shulker (Litematica pick path)", "lapis block never arrived");
+            fail("C21 Litematica schematic pick block pulls from a shulker", "lapis block never arrived");
         }
-        context.getInput().pressKey(GLFW.GLFW_KEY_R);
-        context.waitTicks(2);
-        check("C22 R toggles Auto Take Out off", !Configs.AUTO_TAKE_OUT.getBooleanValue(), "still on");
     }
 
     private Map<BlockPos, ContainerStatus> waitForStatuses(ClientGameTestContext context, Predicate<Map<BlockPos, ContainerStatus>> ready) {

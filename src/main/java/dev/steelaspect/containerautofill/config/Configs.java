@@ -43,7 +43,6 @@ public class Configs implements IConfigHandler {
     public static final ConfigBoolean MATCH_SHULKER_BOXES_BY_CONTENT = new ConfigBoolean("matchShulkerBoxesByContent", false).apply(PREFIX);
     public static final ConfigBoolean CLOSE_AFTER_LOOK_FILL = new ConfigBoolean("closeAfterLookFill", true).apply(PREFIX);
     public static final ConfigBoolean SHULKER_PICK_BLOCK = new ConfigBoolean("shulkerPickBlock", true).apply(PREFIX);
-    public static final ConfigBooleanHotkeyed AUTO_TAKE_OUT = new ConfigBooleanHotkeyed("autoTakeOut", false, "R").apply(PREFIX);
     public static final ConfigBoolean DEBUG_LOGGING = new ConfigBoolean("debugLogging", false).apply(PREFIX);
 
     // --- Linked storage (TakeItOut tab) ---
@@ -71,7 +70,6 @@ public class Configs implements IConfigHandler {
 
     /** TakeItOut behaviour: pulling items out of shulker boxes in the inventory. */
     public static final ImmutableList<IConfigBase> TAKEITOUT = ImmutableList.of(
-            AUTO_TAKE_OUT,
             HOTBAR_REFILL,
             SINGLE_ITEM_MODE,
             SINGLE_ITEM_BUFFER,
@@ -132,7 +130,7 @@ public class Configs implements IConfigHandler {
     );
 
     /** Boolean options with a toggle hotkey. */
-    public static final ImmutableList<ConfigBooleanHotkeyed> TOGGLES = ImmutableList.of(AUTO_TAKE_OUT, HIGHLIGHT_CONTAINERS, SINGLE_ITEM_MODE, LINKED_OUTLINES, HOTBAR_REFILL, RESTOCK_ENABLED);
+    public static final ImmutableList<ConfigBooleanHotkeyed> TOGGLES = ImmutableList.of(HIGHLIGHT_CONTAINERS, SINGLE_ITEM_MODE, LINKED_OUTLINES, HOTBAR_REFILL, RESTOCK_ENABLED);
 
     // --- Hotkeys ---
     /** Fills the container whose screen is currently open. Unbound by default; only fires inside a GUI. */
