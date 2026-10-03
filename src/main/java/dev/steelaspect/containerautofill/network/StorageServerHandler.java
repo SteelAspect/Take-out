@@ -19,6 +19,7 @@ import net.minecraft.registry.RegistryKeys;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.Identifier;
+import net.minecraft.util.collection.DefaultedList;
 import net.minecraft.util.math.BlockPos;
 
 import java.util.ArrayList;
@@ -26,6 +27,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.IntSupplier;
+import java.util.function.UnaryOperator;
 
 /**
  * Server side of linked storage. Any container in a loaded chunk can be used (the owner's chosen rule),
@@ -46,12 +49,16 @@ public final class StorageServerHandler {
     /** Registers payload types and receivers. Called from the mod's common entrypoint and the server jar. */
     public static void register() {
         PayloadTypeRegistry.playC2S().register(StoragePayloads.Take.ID, StoragePayloads.Take.CODEC);
+        PayloadTypeRegistry.playC2S().register(StoragePayloads.TakeFromShulker.ID, StoragePayloads.TakeFromShulker.CODEC);
         PayloadTypeRegistry.playC2S().register(StoragePayloads.Deposit.ID, StoragePayloads.Deposit.CODEC);
         PayloadTypeRegistry.playC2S().register(StoragePayloads.Query.ID, StoragePayloads.Query.CODEC);
         PayloadTypeRegistry.playS2C().register(StoragePayloads.Contents.ID, StoragePayloads.Contents.CODEC);
         PayloadTypeRegistry.playS2C().register(StoragePayloads.Taken.ID, StoragePayloads.Taken.CODEC);
 
-        ServerPlayNetworking.registerGlobalReceiver(StoragePayloads.Take.ID, (p, ctx) -> take(ctx.player(), p));
+        ServerPlayNetworking.registerGlobalReceiver(StoragePayloads.Take.ID, (p, ctx) -> take(ctx.player(), p.requestId(),
+                p.dimension(), p.pos(), p.slot(), () -> moveToPlayer(ctx.player(), p)));
+        ServerPlayNetworking.registerGlobalReceiver(StoragePayloads.TakeFromShulker.ID, (p, ctx) -> take(ctx.player(), p.requestId(),
+                p.dimension(), p.pos(), p.slot(), () -> moveFromShulkerToPlayer(ctx.player(), p)));
         ServerPlayNetworking.registerGlobalReceiver(StoragePayloads.Deposit.ID, (p, ctx) -> deposit(ctx.player(), p));
         ServerPlayNetworking.registerGlobalReceiver(StoragePayloads.Query.ID, (p, ctx) -> query(ctx.player(), p));
         FillServerHandler.register();
@@ -69,17 +76,17 @@ public final class StorageServerHandler {
         return blockEntity instanceof Inventory inventory ? inventory : null;
     }
 
-    private static void take(ServerPlayerEntity player, StoragePayloads.Take request) {
+    private static void take(ServerPlayerEntity player, int requestId, Identifier dimension, BlockPos pos, int slot, IntSupplier move) {
         if (player == null) return;
         // Flush earlier changes first (e.g. the block just placed from the hand). Otherwise "1 -> 0 -> 1"
         // within one tick looks unchanged to the sync and the client never hears that a new item arrived.
         player.currentScreenHandler.sendContentUpdates();
-        int moved = moveToPlayer(player, request);
+        int moved = move.getAsInt();
         // Sync the inventory now instead of at the end of the tick, then answer, so the client sees the
         // item before the reply and can use it (or try another source) straight away.
         player.currentScreenHandler.sendContentUpdates();
         if (ServerPlayNetworking.canSend(player, StoragePayloads.Taken.ID)) {
-            ServerPlayNetworking.send(player, new StoragePayloads.Taken(request.requestId(), request.dimension(), request.pos(), request.slot(), moved));
+            ServerPlayNetworking.send(player, new StoragePayloads.Taken(requestId, dimension, pos, slot, moved));
         }
     }
 
@@ -91,11 +98,58 @@ public final class StorageServerHandler {
         if (inSlot.isEmpty()) return 0;
         ItemStack moved = inventory.removeStack(request.slot(), Math.min(request.count(), inSlot.getCount()));
         if (moved.isEmpty()) return 0;
-        int amount = moved.getCount();
         inventory.markDirty();
+        return give(player, moved, request.toHand(), left -> {
+            ItemStack rest = HopperBlockEntity.transfer(null, inventory, left, null);
+            inventory.markDirty();
+            return rest;
+        });
+    }
 
+    /** Takes items out of a shulker box lying in a container slot; the box is changed in place. */
+    private static int moveFromShulkerToPlayer(ServerPlayerEntity player, StoragePayloads.TakeFromShulker request) {
+        Inventory inventory = inventoryAt(player, request.dimension(), request.pos(), true);
+        if (inventory == null || request.slot() < 0 || request.slot() >= inventory.size() || request.count() <= 0
+                || request.innerSlot() < 0 || request.innerSlot() >= ShulkerUtil.SHULKER_SLOTS) return 0;
+
+        ItemStack box = inventory.getStack(request.slot());
+        // Stacked boxes share one contents component, so taking from one would change them all.
+        if (box.getCount() != 1) return 0;
+        DefaultedList<ItemStack> contents = ShulkerUtil.getContents(box);
+        if (contents == null) return 0;
+        ItemStack inner = contents.get(request.innerSlot());
+        if (inner.isEmpty()) return 0;
+        ItemStack moved = inner.split(Math.min(request.count(), inner.getCount()));
+        ShulkerUtil.setContents(box, contents);
+        inventory.markDirty();
+        return give(player, moved, request.toHand(), left -> {
+            // What doesn't fit goes back into the same slot of the box.
+            DefaultedList<ItemStack> now = ShulkerUtil.getContents(box);
+            if (now == null) return left;
+            ItemStack there = now.get(request.innerSlot());
+            if (there.isEmpty()) {
+                now.set(request.innerSlot(), left.copy());
+                left.setCount(0);
+            } else if (ItemStack.areItemsAndComponentsEqual(there, left)) {
+                int n = Math.min(left.getCount(), there.getMaxCount() - there.getCount());
+                there.increment(n);
+                left.decrement(n);
+            }
+            ShulkerUtil.setContents(box, now);
+            inventory.markDirty();
+            return left;
+        });
+    }
+
+    /**
+     * Gives the player {@code moved} (into the main hand if asked, the old hand item moving to a free slot).
+     * What doesn't fit is handed to {@code putBack}; anything it can't take is dropped. Returns how many the
+     * player got.
+     */
+    private static int give(ServerPlayerEntity player, ItemStack moved, boolean toHand, UnaryOperator<ItemStack> putBack) {
+        int amount = moved.getCount();
         PlayerInventory playerInventory = player.getInventory();
-        if (request.toHand()) {
+        if (toHand) {
             int free = playerInventory.getEmptySlot();
             if (free >= 0 && free < ShulkerUtil.PLAYER_MAIN_SLOTS) {
                 playerInventory.setStack(free, playerInventory.getSelectedStack());
@@ -106,9 +160,8 @@ public final class StorageServerHandler {
         playerInventory.insertStack(moved);
         if (!moved.isEmpty()) {
             amount -= moved.getCount();
-            ItemStack left = HopperBlockEntity.transfer(null, inventory, moved, null);
+            ItemStack left = putBack.apply(moved);
             if (!left.isEmpty()) player.dropItem(left, false);
-            inventory.markDirty();
         }
         return amount;
     }

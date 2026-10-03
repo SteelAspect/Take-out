@@ -55,7 +55,7 @@ public final class TakeItOutFeatures {
      * (or one is already in flight for this item), so Litematica's own pick is skipped this time.
      */
     public static boolean onSchematicPickBlock(ItemStack required, MinecraftClient client) {
-        if (!Configs.ENABLE_MOD.getBooleanValue() || !Configs.SHULKER_PICK_BLOCK.getBooleanValue()) return false;
+        if (!isOn() || !Configs.SHULKER_PICK_BLOCK.getBooleanValue()) return false;
         if (client.player == null || client.player.isCreative() || required.isEmpty()) return false;
 
         Predicate<ItemStack> matcher = s -> ItemStack.areItemsAndComponentsEqual(s, required);
@@ -79,7 +79,7 @@ public final class TakeItOutFeatures {
     private static void topUpBuffer(MinecraftClient client) {
         if (bufferItem.isEmpty()) return;
         int buffer = Configs.SINGLE_ITEM_BUFFER.getIntegerValue();
-        if (client.player == null || client.currentScreen != null || buffer <= 1 || !Configs.SINGLE_ITEM_MODE.getBooleanValue()
+        if (!isOn() || client.player == null || client.currentScreen != null || buffer <= 1 || !Configs.SINGLE_ITEM_MODE.getBooleanValue()
                 || !fi.dy.masa.litematica.config.Configs.Generic.EASY_PLACE_MODE.getBooleanValue()
                 || !Hotkeys.EASY_PLACE_ACTIVATION.getKeybind().isKeybindHeld()) {
             bufferItem = ItemStack.EMPTY;
@@ -155,7 +155,7 @@ public final class TakeItOutFeatures {
 
     /** Vanilla pick block on a real block (survival only, as in TakeItOut). */
     public static void onVanillaPickBlock(MinecraftClient client, BlockPos pos) {
-        if (!Configs.ENABLE_MOD.getBooleanValue() || !Configs.SHULKER_PICK_BLOCK.getBooleanValue()) return;
+        if (!isOn() || !Configs.SHULKER_PICK_BLOCK.getBooleanValue()) return;
         if (client.player == null || client.world == null || client.player.isCreative()) return;
 
         BlockState state = client.world.getBlockState(pos);
@@ -166,6 +166,11 @@ public final class TakeItOutFeatures {
         if (ShulkerRetriever.countInInventory(client.player.getInventory(), matcher) > 0) return;
         if (ShulkerRetriever.isWaitingFor(stack) || StorageRetriever.isWaitingFor(stack)) return;
         requestFromAnySource(client, stack, matcher);
+    }
+
+    /** The mod and its TakeItOut switch are both on; otherwise nothing is pulled into the hand. */
+    public static boolean isOn() {
+        return Configs.ENABLE_MOD.getBooleanValue() && Configs.TAKEITOUT_ENABLED.getBooleanValue();
     }
 
     /** Respects Litematica's "pickBlockableSlots" list (1-based, comma separated, ranges allowed). */

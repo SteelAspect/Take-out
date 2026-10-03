@@ -69,6 +69,8 @@ import java.util.function.Predicate;
 public class ContainerAutoFillClientGameTest implements FabricClientGameTest {
     private static final Logger LOG = LoggerFactory.getLogger("ContainerAutoFillTest");
     private static final int AUTO_FILL_KEY = GLFW.GLFW_KEY_G;
+    /** Crafter checks (T9 and the crafter in H8) are skipped at the owner's request; set to true to run them. */
+    private static final boolean RUN_CRAFTER_TESTS = false;
 
     private final List<String> failures = new ArrayList<>();
     private final List<String> passes = new ArrayList<>();
@@ -106,6 +108,7 @@ public class ContainerAutoFillClientGameTest implements FabricClientGameTest {
             testScreenClosedMidFill(context, world);
             testVanillaPickFromShulker(context, world);
             testNoPullOnLook(context, world);
+            testTakeItOutOff(context, world);
             testMoreContainerTypes(context, world);
         }
 
@@ -616,6 +619,37 @@ public class ContainerAutoFillClientGameTest implements FabricClientGameTest {
         }
     }
 
+    private void testTakeItOutOff(ClientGameTestContext context, TestSingleplayerContext world) {
+        // With Enable TakeItOut off, neither vanilla nor Litematica pick block pulls from a shulker.
+        context.runOnClient(client -> Configs.TAKEITOUT_ENABLED.setBooleanValue(false));
+        try {
+            setPlayerInventory(world, Map.of(9, shulkerWith(Items.LIME_SHULKER_BOX, 2, stack(Items.EMERALD_BLOCK, 10))));
+            lookAt(context, world, emerald);
+            context.getInput().pressKey(options -> options.pickItemKey);
+            context.waitTicks(40);
+            check("C27 TakeItOut off: vanilla pick block pulls nothing", context.computeOnClient(client -> !clientHas(client, Items.EMERALD_BLOCK)),
+                    "emerald block was pulled from the shulker");
+
+            setPlayerInventory(world, Map.of(9, shulkerWith(Items.BLUE_SHULKER_BOX, 0, stack(Items.LAPIS_BLOCK, 5))));
+            lookAt(context, world, lapisSpot);
+            context.runOnClient(client -> fi.dy.masa.litematica.util.WorldUtils.doSchematicWorldPickBlock(true, client));
+            context.waitTicks(40);
+            check("C28 TakeItOut off: Litematica schematic pick block pulls nothing", context.computeOnClient(client -> !clientHas(client, Items.LAPIS_BLOCK)),
+                    "lapis block was pulled from the shulker");
+        } finally {
+            context.runOnClient(client -> Configs.TAKEITOUT_ENABLED.setBooleanValue(true));
+        }
+
+        // Back on: the same pick pulls again.
+        context.runOnClient(client -> fi.dy.masa.litematica.util.WorldUtils.doSchematicWorldPickBlock(true, client));
+        try {
+            context.waitFor(client -> clientHas(client, Items.LAPIS_BLOCK), 100);
+            check("C29 TakeItOut back on: schematic pick block pulls again", true, "");
+        } catch (Throwable t) {
+            fail("C29 TakeItOut back on: schematic pick block pulls again", "lapis block never arrived");
+        }
+    }
+
     private Map<BlockPos, ContainerStatus> waitForStatuses(ClientGameTestContext context, Predicate<Map<BlockPos, ContainerStatus>> ready) {
         try {
             context.waitFor(client -> ready.test(ContainerHighlighter.statuses()), 200);
@@ -634,8 +668,9 @@ public class ContainerAutoFillClientGameTest implements FabricClientGameTest {
         check("H5 wrong block type not highlighted", !statuses.containsKey(mismatch), "mismatch=" + statuses.get(mismatch));
         check("H6 non-container schematic block not highlighted", !statuses.containsKey(lapisSpot), "lapis=" + statuses.get(lapisSpot));
         check("H7 double chest halves both highlighted", statuses.containsKey(doubleLeft) && statuses.containsKey(doubleRight), "left=" + statuses.get(doubleLeft) + " right=" + statuses.get(doubleRight));
-        check("H8 other container types highlighted (furnace, brewing stand, crafter, copper, recoloured shulker)",
-                statuses.containsKey(furnace) && statuses.containsKey(brewingStand) && statuses.containsKey(crafter)
+        check(RUN_CRAFTER_TESTS ? "H8 other container types highlighted (furnace, brewing stand, crafter, copper, recoloured shulker)"
+                        : "H8 other container types highlighted (furnace, brewing stand, copper, recoloured shulker; crafter skipped)",
+                statuses.containsKey(furnace) && statuses.containsKey(brewingStand) && (!RUN_CRAFTER_TESTS || statuses.containsKey(crafter))
                         && statuses.containsKey(copperLeft) && statuses.containsKey(recoloredShulker), "statuses=" + statuses.size());
         check("H10 container the schematic expects empty, and is, has no colour",
                 statuses.get(emptyChest) == ContainerStatus.NOTHING_EXPECTED && HighlightRenderer.colorFor(ContainerStatus.NOTHING_EXPECTED) == null,
@@ -692,7 +727,7 @@ public class ContainerAutoFillClientGameTest implements FabricClientGameTest {
                 Map.of(copperRight, Map.of(0, stack(Items.COPPER_INGOT, 11)), copperLeft, Map.of(5, stack(Items.RAW_COPPER, 12))));
         fillAndCheck(context, world, "T8 shulker box of a different colour than schematic", recoloredShulker,
                 Map.of(9, stack(Items.APPLE, 64)), Map.of(recoloredShulker, Map.of(0, stack(Items.APPLE, 3))));
-        testCrafterKnownIssue(context, world);
+        if (RUN_CRAFTER_TESTS) testCrafterKnownIssue(context, world);
     }
 
     /**

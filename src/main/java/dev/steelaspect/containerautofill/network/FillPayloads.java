@@ -32,7 +32,8 @@ public final class FillPayloads {
 
     /**
      * Fill the container at {@code pos} so each slot in {@code expected} holds that stack. Items come from the
-     * player's inventory, then (optionally) shulker boxes in it, then the listed linked containers.
+     * player's inventory, then (optionally) shulker boxes in it, then the listed linked containers, then (with
+     * {@code useShulkers}) shulker boxes stored in those linked containers.
      */
     public record Fill(int requestId, Identifier dimension, BlockPos pos, List<StoragePayloads.SlotStack> expected,
                        List<Integer> disabledSlots, boolean applyLocks, boolean clearWrong, boolean useShulkers,

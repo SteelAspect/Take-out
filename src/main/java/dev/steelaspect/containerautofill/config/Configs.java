@@ -46,6 +46,8 @@ public class Configs implements IConfigHandler {
     public static final ConfigBoolean DEBUG_LOGGING = new ConfigBoolean("debugLogging", false).apply(PREFIX);
 
     // --- Linked storage (TakeItOut tab) ---
+    /** Master switch for pulling items into the hand (pick block, easy place, Hotbar Refill); fills and Restock don't use it. */
+    public static final ConfigBooleanHotkeyed TAKEITOUT_ENABLED = new ConfigBooleanHotkeyed("takeItOutEnabled", true, "").apply(PREFIX);
     public static final ConfigBooleanHotkeyed SINGLE_ITEM_MODE = new ConfigBooleanHotkeyed("singleItemMode", false, "B").apply(PREFIX);
     public static final ConfigBooleanHotkeyed HOTBAR_REFILL = new ConfigBooleanHotkeyed("hotbarRefill", true, "").apply(PREFIX);
     public static final ConfigInteger SINGLE_ITEM_BUFFER = new ConfigInteger("singleItemBuffer", 3, 1, 16).apply(PREFIX);
@@ -70,6 +72,7 @@ public class Configs implements IConfigHandler {
 
     /** TakeItOut behaviour: pulling items out of shulker boxes in the inventory. */
     public static final ImmutableList<IConfigBase> TAKEITOUT = ImmutableList.of(
+            TAKEITOUT_ENABLED,
             HOTBAR_REFILL,
             SINGLE_ITEM_MODE,
             SINGLE_ITEM_BUFFER,
@@ -130,7 +133,7 @@ public class Configs implements IConfigHandler {
     );
 
     /** Boolean options with a toggle hotkey. */
-    public static final ImmutableList<ConfigBooleanHotkeyed> TOGGLES = ImmutableList.of(HIGHLIGHT_CONTAINERS, SINGLE_ITEM_MODE, LINKED_OUTLINES, HOTBAR_REFILL, RESTOCK_ENABLED);
+    public static final ImmutableList<ConfigBooleanHotkeyed> TOGGLES = ImmutableList.of(HIGHLIGHT_CONTAINERS, TAKEITOUT_ENABLED, SINGLE_ITEM_MODE, LINKED_OUTLINES, HOTBAR_REFILL, RESTOCK_ENABLED);
 
     // --- Hotkeys ---
     /** Fills the container whose screen is currently open. Unbound by default; only fires inside a GUI. */

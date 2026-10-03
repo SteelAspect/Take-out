@@ -27,6 +27,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Predicate;
 
 /**
  * Server-side instant fill: the server puts every expected item into the container in one go, without
@@ -136,6 +137,9 @@ public final class InstantFill {
      * aren't known yet. Capped, so any number of linked containers fits in one request.
      */
     private static List<FillPayloads.Source> pickSources(MinecraftClient client, Identifier dimension, Set<BlockPos> targets, List<ItemStack> wanted) {
+        Predicate<ItemStack> needed = have -> wanted.stream().anyMatch(want -> ItemStack.areItemsAndComponentsEqual(have, want));
+        // The server also looks inside shulker boxes in these containers when Use Shulker Boxes is on.
+        boolean inShulkers = Configs.USE_TAKEITOUT_SOURCES.getBooleanValue() && StorageContents.isShulkerTakeSupported();
         List<FillPayloads.Source> known = new ArrayList<>();
         List<FillPayloads.Source> unknown = new ArrayList<>();
         for (StorageStore.Entry entry : StorageActions.sortedByDistance(client, StorageStore.linkedEntries())) {
@@ -145,7 +149,7 @@ public final class InstantFill {
             if (snapshot == null) {
                 unknown.add(source);
             } else if (snapshot.available() && snapshot.items().values().stream()
-                    .anyMatch(have -> wanted.stream().anyMatch(want -> ItemStack.areItemsAndComponentsEqual(have, want)))) {
+                    .anyMatch(have -> needed.test(have) || (inShulkers && holdsInShulker(have, needed)))) {
                 known.add(source);
             }
         }
@@ -155,6 +159,12 @@ public final class InstantFill {
             out.add(source);
         }
         return out.size() > FillPayloads.MAX_SOURCES ? out.subList(0, FillPayloads.MAX_SOURCES) : out;
+    }
+
+    private static boolean holdsInShulker(ItemStack box, Predicate<ItemStack> matcher) {
+        boolean[] found = {false};
+        StorageActions.forEachInShulker(box, (inner, slot) -> found[0] |= matcher.test(inner));
+        return found[0];
     }
 
     public static void onResult(MinecraftClient client, FillPayloads.Result result) {

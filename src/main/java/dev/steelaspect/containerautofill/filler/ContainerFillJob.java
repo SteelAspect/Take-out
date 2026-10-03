@@ -339,13 +339,15 @@ public final class ContainerFillJob {
     private boolean requestFromLinkedStorage(MinecraftClient client, ItemStack want, ItemMatcher.StackKey key, int need) {
         if (client.player == null) return false;
         Predicate<ItemStack> matcher = s -> ItemStack.areItemsAndComponentsEqual(s, want);
-        if (!StorageRetriever.hasItem(client, matcher)) return false;
+        // Shulker boxes stored in linked containers count as shulker sources (Use Shulker Boxes).
+        boolean inShulkers = Configs.USE_TAKEITOUT_SOURCES.getBooleanValue();
+        if (!StorageRetriever.hasItem(client, matcher, inShulkers)) return false;
         int before = ShulkerRetriever.countInInventory(client.player.getInventory(), matcher);
         if (client.player.getInventory().getEmptySlot() < 0) {
             this.inventoryFull = true;
             return false;
         }
-        if (!StorageRetriever.request(client, matcher, need, false)) return false;
+        if (!StorageRetriever.request(client, matcher, need, false, inShulkers)) return false;
         this.retrievalWait = new RetrievalWait(key, matcher, before);
         return true;
     }

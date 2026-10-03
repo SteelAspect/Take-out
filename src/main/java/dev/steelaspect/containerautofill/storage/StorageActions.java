@@ -18,6 +18,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.Identifier;
+import net.minecraft.util.collection.DefaultedList;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.hit.HitResult;
 import net.minecraft.util.math.BlockPos;
@@ -32,6 +33,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.ObjIntConsumer;
 import java.util.function.Predicate;
 
 /** Everything the player does with linked storage: linking, taking, dumping, finding. */
@@ -169,21 +171,53 @@ public final class StorageActions {
 
     // ---------------------------------------------------------------- moving items
 
-    public record Source(StorageStore.Entry entry, int slot, ItemStack stack) {
+    /** A stack in a linked container: loose in {@code slot}, or ({@code innerSlot >= 0}) inside the shulker box there. */
+    public record Source(StorageStore.Entry entry, int slot, int innerSlot, ItemStack stack) {
+        public boolean inShulker() {
+            return this.innerSlot >= 0;
+        }
     }
 
-    /** Matching stacks in linked containers, nearest container first. */
+    /** Matching stacks in linked containers, loose or inside shulker boxes stored there. */
     public static List<Source> findSources(MinecraftClient client, Predicate<ItemStack> matcher) {
+        return findSources(client, matcher, true);
+    }
+
+    /**
+     * Matching stacks in linked containers, nearest container first: every loose stack, then (if
+     * {@code inShulkers} and the server supports it) stacks inside shulker boxes stored in them.
+     */
+    public static List<Source> findSources(MinecraftClient client, Predicate<ItemStack> matcher, boolean inShulkers) {
         List<Source> sources = new ArrayList<>();
+        List<Source> nested = new ArrayList<>();
+        boolean openBoxes = inShulkers && StorageContents.isShulkerTakeSupported();
         for (StorageStore.Entry entry : sortedByDistance(client, StorageStore.linkedEntries())) {
             StorageContents.Snapshot snapshot = StorageContents.get(entry.dimensionId(), entry.pos());
             if (snapshot == null || !snapshot.available()) continue;
             snapshot.items().entrySet().stream()
-                    .filter(e -> matcher.test(e.getValue()))
                     .sorted(Map.Entry.comparingByKey())
-                    .forEach(e -> sources.add(new Source(entry, e.getKey(), e.getValue())));
+                    .forEach(e -> {
+                        if (matcher.test(e.getValue())) {
+                            sources.add(new Source(entry, e.getKey(), -1, e.getValue()));
+                        } else if (openBoxes) {
+                            forEachInShulker(e.getValue(), (inner, innerSlot) -> {
+                                if (matcher.test(inner)) nested.add(new Source(entry, e.getKey(), innerSlot, inner));
+                            });
+                        }
+                    });
         }
+        sources.addAll(nested);
         return sources;
+    }
+
+    /** Calls {@code action} for each non-empty slot of a single (unstacked) shulker box; nothing for other stacks. */
+    public static void forEachInShulker(ItemStack box, ObjIntConsumer<ItemStack> action) {
+        if (box.getCount() != 1) return;
+        DefaultedList<ItemStack> contents = ShulkerUtil.getContents(box);
+        if (contents == null) return;
+        for (int i = 0; i < contents.size(); i++) {
+            if (!contents.get(i).isEmpty()) action.accept(contents.get(i), i);
+        }
     }
 
     public static int countAvailable(MinecraftClient client, Predicate<ItemStack> matcher) {
@@ -207,19 +241,36 @@ public final class StorageActions {
 
     /** Sends one take request right away (used by retrieval, which waits for it). */
     public static void takeNow(int requestId, Source source, int count, boolean toHand) {
-        ClientPlayNetworking.send(new StoragePayloads.Take(requestId, source.entry().dimensionId(), source.entry().pos(), source.slot(), count, toHand));
+        ClientPlayNetworking.send(takePayload(requestId, source, count, toHand));
         DIRTY.add(new StorageContents.Key(source.entry().dimensionId(), source.entry().pos()));
         StorageContents.Snapshot snapshot = StorageContents.get(source.entry().dimensionId(), source.entry().pos());
-        if (snapshot != null) {
-            ItemStack left = source.stack().copyWithCount(Math.max(0, source.stack().getCount() - count));
+        if (snapshot == null) return;
+        ItemStack left = source.stack().copyWithCount(Math.max(0, source.stack().getCount() - count));
+        if (!source.inShulker()) {
             if (left.isEmpty()) snapshot.items().remove(source.slot());
             else snapshot.items().put(source.slot(), left);
+            return;
         }
+        ItemStack box = snapshot.items().get(source.slot());
+        DefaultedList<ItemStack> contents = box == null ? null : ShulkerUtil.getContents(box);
+        if (contents == null || source.innerSlot() >= contents.size()) return;
+        contents.set(source.innerSlot(), left.isEmpty() ? ItemStack.EMPTY : left);
+        ItemStack updated = box.copy();
+        ShulkerUtil.setContents(updated, contents);
+        snapshot.items().put(source.slot(), updated);
     }
 
     private static void queueTake(Source source, int count, boolean toHand) {
-        QUEUE.add(new StoragePayloads.Take(0, source.entry().dimensionId(), source.entry().pos(), source.slot(), count, toHand));
+        QUEUE.add(takePayload(0, source, count, toHand));
         DIRTY.add(new StorageContents.Key(source.entry().dimensionId(), source.entry().pos()));
+    }
+
+    private static net.minecraft.network.packet.CustomPayload takePayload(int requestId, Source source, int count, boolean toHand) {
+        Identifier dimension = source.entry().dimensionId();
+        BlockPos pos = source.entry().pos();
+        return source.inShulker()
+                ? new StoragePayloads.TakeFromShulker(requestId, dimension, pos, source.slot(), source.innerSlot(), count, toHand)
+                : new StoragePayloads.Take(requestId, dimension, pos, source.slot(), count, toHand);
     }
 
     /** Hotkey: move the main inventory (not the hotbar) into the dump containers of the active group. */

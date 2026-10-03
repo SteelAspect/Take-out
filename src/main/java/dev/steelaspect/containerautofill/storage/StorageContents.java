@@ -41,6 +41,15 @@ public final class StorageContents {
         }
     }
 
+    /** True if the server can also take items out of shulker boxes stored in linked containers (Cytra Container 1.2.0+). */
+    public static boolean isShulkerTakeSupported() {
+        try {
+            return isSupported() && ClientPlayNetworking.canSend(StoragePayloads.TakeFromShulker.ID);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     public static Snapshot get(Identifier dimension, BlockPos pos) {
         return CACHE.get(new Key(dimension, pos));
     }

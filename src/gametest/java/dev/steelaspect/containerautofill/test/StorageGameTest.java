@@ -18,6 +18,7 @@ import net.minecraft.block.enums.ChestType;
 import net.minecraft.util.math.Direction;
 import dev.steelaspect.containerautofill.storage.StorageActions;
 import dev.steelaspect.containerautofill.storage.StorageContents;
+import dev.steelaspect.containerautofill.storage.StorageRetriever;
 import dev.steelaspect.containerautofill.storage.StorageScreen;
 import dev.steelaspect.containerautofill.storage.StorageStore;
 import fi.dy.masa.malilib.event.InputEventHandler;
@@ -87,6 +88,7 @@ public class StorageGameTest implements FabricClientGameTest {
             testInstantFill(context, world);
             testAreaFillAndServerStatus(context, world);
             testCreativeFill(context, world);
+            testShulkersInLinkedChests(context, world);
             testLookAtAndGroups(context);
         }
 
@@ -450,6 +452,12 @@ public class StorageGameTest implements FabricClientGameTest {
                 Map.of(0, stack(Items.COBBLESTONE, 1), 20, stack(Items.COBBLESTONE, 10)), false,
                 c -> c.player.getInventory().getStack(0).isEmpty() && c.player.getInventory().getStack(20).getCount() == 10);
         context.runOnClient(client -> Configs.HOTBAR_REFILL.setBooleanValue(true));
+
+        context.runOnClient(client -> Configs.TAKEITOUT_ENABLED.setBooleanValue(false));
+        refillCase(context, world, target, "R6 TakeItOut off: slot stays empty",
+                Map.of(0, stack(Items.COBBLESTONE, 1), 20, stack(Items.COBBLESTONE, 10)), false,
+                c -> c.player.getInventory().getStack(0).isEmpty() && c.player.getInventory().getStack(20).getCount() == 10);
+        context.runOnClient(client -> Configs.TAKEITOUT_ENABLED.setBooleanValue(true));
 
         // R5: dropping the last item (Q) is not using it up, so nothing is refilled.
         setPlayerInventory(world, Map.of(0, stack(Items.OAK_PLANKS, 1), 20, stack(Items.OAK_PLANKS, 10)));
@@ -921,6 +929,124 @@ public class StorageGameTest implements FabricClientGameTest {
         } catch (Throwable ignored) {
         }
         return dev.steelaspect.containerautofill.highlight.ContainerHighlighter.statuses();
+    }
+
+    /** N1-N7: items inside shulker boxes stored in a linked chest (menu, take, pick block, fills). */
+    private void testShulkersInLinkedChests(ClientGameTestContext context, TestSingleplayerContext world) {
+        BlockPos boxChest = chestA.add(8, 0, 0);
+        BlockPos coalSpot = chestA.add(10, 0, 5);
+        world.getServer().runCommand("gamemode survival @a");
+        setPlayerInventory(world, Map.of());
+        List<BlockPos> linked = context.computeOnClient(client -> StorageStore.linkedEntries().stream().map(StorageStore.Entry::pos).toList());
+        world.getServer().runOnServer(server -> {
+            ServerWorld w = server.getOverworld();
+            w.setBlockState(boxChest, Blocks.CHEST.getDefaultState());
+            w.setBlockState(coalSpot, Blocks.COAL_BLOCK.getDefaultState());
+            ItemStack box = shulkerWith(null, 4, stack(Items.LAPIS_BLOCK, 20));
+            fill(w, boxChest, Map.of(
+                    0, box,
+                    1, shulkerWith(null, 0, stack(Items.COAL_BLOCK, 8)),
+                    2, stack(Items.BONE_BLOCK, 2),
+                    3, shulkerWith(null, 7, stack(Items.BONE_BLOCK, 10)),
+                    4, shulkerWith(null, 2, stack(Items.OAK_LOG, 30))));
+            // Oak logs only inside that shulker box: none loose in other linked containers.
+            for (BlockPos pos : linked) {
+                if (!(w.getBlockEntity(pos) instanceof Inventory inv)) continue;
+                for (int i = 0; i < inv.size(); i++) if (inv.getStack(i).isOf(Items.OAK_LOG)) inv.setStack(i, ItemStack.EMPTY);
+            }
+            ((Inventory) w.getBlockEntity(area1)).clear();
+        });
+        context.runOnClient(client -> {
+            StorageStore.link(overworld, boxChest);
+            Configs.USE_TAKEITOUT_SOURCES.setBooleanValue(true);
+            StorageActions.refreshAll();
+        });
+        context.waitTicks(30);
+
+        check("N1 supported: the server can take from shulker boxes in linked containers",
+                context.computeOnClient(client -> StorageContents.isShulkerTakeSupported()), "take_from_shulker channel missing");
+        int lapis = context.computeOnClient(client -> StorageActions.countAvailable(client, s -> s.isOf(Items.LAPIS_BLOCK)));
+        check("N1 storage menu counts items inside shulker boxes in a linked chest", lapis == 20, "lapis=" + lapis);
+
+        context.runOnClient(client -> StorageActions.take(client, stack(Items.LAPIS_BLOCK, 1), 5));
+        try {
+            context.waitFor(client -> clientHas(client, Items.LAPIS_BLOCK, 5), 100);
+        } catch (Throwable ignored) {
+        }
+        check("N2 menu take pulls 5 out of the shulker box in the linked chest",
+                serverCount(world, s -> s.isOf(Items.LAPIS_BLOCK)) == 5 && boxCount(world, boxChest, 0, Items.LAPIS_BLOCK) == 15,
+                "player=" + serverCount(world, s -> s.isOf(Items.LAPIS_BLOCK)) + " box=" + boxCount(world, boxChest, 0, Items.LAPIS_BLOCK));
+
+        lookAt(context, world, coalSpot);
+        context.getInput().pressKey(options -> options.pickItemKey);
+        try {
+            context.waitFor(client -> client.player.getMainHandStack().isOf(Items.COAL_BLOCK), 100);
+        } catch (Throwable ignored) {
+        }
+        check("N3 pick block pulls from a shulker box in a linked chest into the hand",
+                context.computeOnClient(client -> client.player.getMainHandStack().isOf(Items.COAL_BLOCK))
+                        && boxCount(world, boxChest, 1, Items.COAL_BLOCK) == 0,
+                "hand=" + context.computeOnClient(client -> client.player.getMainHandStack().toString()) + " box=" + boxCount(world, boxChest, 1, Items.COAL_BLOCK));
+
+        context.runOnClient(client -> StorageRetriever.request(client, s -> s.isOf(Items.BONE_BLOCK), 2, false));
+        try {
+            context.waitFor(client -> clientHas(client, Items.BONE_BLOCK, 2), 100);
+        } catch (Throwable ignored) {
+        }
+        check("N4 loose items are taken before shulker contents",
+                containerCount(world, boxChest, Items.BONE_BLOCK) == 0 && boxCount(world, boxChest, 3, Items.BONE_BLOCK) == 10,
+                "loose=" + containerCount(world, boxChest, Items.BONE_BLOCK) + " box=" + boxCount(world, boxChest, 3, Items.BONE_BLOCK));
+
+        // Instant fill: area1 expects 10 oak logs, which are only in the shulker box.
+        context.runOnClient(client -> StorageActions.refreshAll());
+        context.waitTicks(20);
+        lookAt(context, world, area1);
+        var before = dev.steelaspect.containerautofill.filler.AutoFillController.getLastResult();
+        context.getInput().pressKey(GLFW.GLFW_KEY_V);
+        try {
+            context.waitFor(client -> dev.steelaspect.containerautofill.filler.AutoFillController.getLastResult() != before, 100);
+        } catch (Throwable ignored) {
+        }
+        check("N5 instant fill takes from a shulker box in a linked chest",
+                matches(contents(world, area1), Map.of(0, stack(Items.OAK_LOG, 10))) && boxCount(world, boxChest, 4, Items.OAK_LOG) == 20,
+                "area1=" + contents(world, area1) + " box=" + boxCount(world, boxChest, 4, Items.OAK_LOG));
+
+        world.getServer().runOnServer(server -> ((Inventory) server.getOverworld().getBlockEntity(area1)).clear());
+        context.runOnClient(client -> {
+            Configs.USE_TAKEITOUT_SOURCES.setBooleanValue(false);
+            StorageActions.refreshAll();
+        });
+        context.waitTicks(20);
+        var beforeOff = dev.steelaspect.containerautofill.filler.AutoFillController.getLastResult();
+        context.getInput().pressKey(GLFW.GLFW_KEY_V);
+        try {
+            context.waitFor(client -> dev.steelaspect.containerautofill.filler.AutoFillController.getLastResult() != beforeOff, 100);
+        } catch (Throwable ignored) {
+        }
+        check("N6 Use Shulker Boxes off: instant fill leaves shulker boxes in linked chests alone",
+                contents(world, area1).isEmpty() && boxCount(world, boxChest, 4, Items.OAK_LOG) == 20,
+                "area1=" + contents(world, area1) + " box=" + boxCount(world, boxChest, 4, Items.OAK_LOG));
+        context.runOnClient(client -> Configs.USE_TAKEITOUT_SOURCES.setBooleanValue(true));
+
+        int boxes = 0;
+        for (int slot : new int[]{0, 1, 3, 4}) {
+            final int s = slot;
+            boolean isBox = world.getServer().computeOnServer(server ->
+                    ((Inventory) server.getOverworld().getBlockEntity(boxChest)).getStack(s).isIn(net.minecraft.registry.tag.ItemTags.SHULKER_BOXES));
+            if (isBox) boxes++;
+        }
+        check("N7 the shulker boxes themselves stay in the chest", boxes == 4, "boxes=" + boxes);
+        context.runOnClient(client -> StorageStore.remove(StorageStore.find(overworld, boxChest)));
+        setPlayerInventory(world, Map.of());
+    }
+
+    /** How many of {@code item} the shulker box in a container slot holds. */
+    private int boxCount(TestSingleplayerContext world, BlockPos pos, int slot, Item item) {
+        return world.getServer().computeOnServer(server -> {
+            ItemStack box = ((Inventory) server.getOverworld().getBlockEntity(pos)).getStack(slot);
+            var contents = box.get(DataComponentTypes.CONTAINER);
+            return contents == null ? 0 : contents.stream().filter(i -> i.isOf(item)).mapToInt(ItemStack::getCount).sum();
+        });
     }
 
     private void testLookAtAndGroups(ClientGameTestContext context) {

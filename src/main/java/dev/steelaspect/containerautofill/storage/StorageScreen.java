@@ -194,12 +194,18 @@ public class StorageScreen extends Screen {
             double scroll = this.getScrollY();
             Map<ItemMatcher.StackKey, Integer> totals = new LinkedHashMap<>();
             int sources = 0;
+            // Items inside shulker boxes stored in linked containers count too, when the server can take them.
+            boolean inShulkers = StorageContents.isShulkerTakeSupported();
             for (StorageStore.Entry entry : StorageStore.linkedEntries()) {
                 StorageContents.Snapshot snapshot = StorageContents.get(entry.dimensionId(), entry.pos());
                 if (snapshot == null || !snapshot.available()) continue;
                 sources++;
                 for (ItemStack stack : snapshot.items().values()) {
                     totals.merge(new ItemMatcher.StackKey(stack), stack.getCount(), Integer::sum);
+                    if (inShulkers) {
+                        StorageActions.forEachInShulker(stack, (inner, slot) ->
+                                totals.merge(new ItemMatcher.StackKey(inner), inner.getCount(), Integer::sum));
+                    }
                 }
             }
             StorageScreen.this.sourceCount = sources;

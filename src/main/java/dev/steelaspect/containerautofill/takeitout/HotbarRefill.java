@@ -64,7 +64,7 @@ public final class HotbarRefill {
         int slot = wantedSlot;
         wanted = ItemStack.EMPTY;
 
-        if (!Configs.ENABLE_MOD.getBooleanValue() || !Configs.HOTBAR_REFILL.getBooleanValue()) return;
+        if (!TakeItOutFeatures.isOn() || !Configs.HOTBAR_REFILL.getBooleanValue()) return;
         if (client.player == null || client.interactionManager == null || client.player.isCreative()) return;
         if (fi.dy.masa.litematica.config.Configs.Generic.EASY_PLACE_MODE.getBooleanValue()) return;
         if (client.currentScreen != null || client.player.currentScreenHandler != client.player.playerScreenHandler) return;
@@ -107,7 +107,8 @@ public final class HotbarRefill {
             return;
         }
         int count = Configs.SINGLE_ITEM_MODE.getBooleanValue() ? Configs.SINGLE_ITEM_BUFFER.getIntegerValue() : item.getMaxCount();
-        if (StorageRetriever.request(client, matcher, count, true)) {
+        // Shulker boxes stored in linked containers follow the same option as shulkers you carry.
+        if (StorageRetriever.request(client, matcher, count, true, Configs.SHULKER_PICK_BLOCK.getBooleanValue())) {
             Configs.debug("Hotbar refill: {}x {} requested from linked storage", count, item);
         }
     }

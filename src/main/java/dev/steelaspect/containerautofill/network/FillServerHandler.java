@@ -150,7 +150,10 @@ public final class FillServerHandler {
         return result(request, true, filled, wrong, missing);
     }
 
-    /** Takes up to {@code need} matching items: inventory, then shulkers in it, then linked containers. */
+    /**
+     * Takes up to {@code need} matching items: inventory, then shulkers in it, then linked containers, then
+     * shulkers inside linked containers. Both shulker steps follow {@code useShulkers}.
+     */
     private static ItemStack pull(ServerPlayerEntity player, ItemStack want, int need, FillPayloads.Fill request) {
         ItemStack result = ItemStack.EMPTY;
         int remaining = need;
@@ -198,6 +201,37 @@ public final class FillServerHandler {
                 changed = true;
             }
             if (changed) container.markDirty();
+        }
+
+        // Last: shulker boxes stored in those linked containers.
+        if (request.useShulkers()) {
+            for (FillPayloads.Source source : request.sources()) {
+                if (remaining <= 0) break;
+                if (source.pos().equals(request.pos()) && source.dimension().equals(request.dimension())) continue;
+                Inventory container = StorageServerHandler.inventoryAt(player, source.dimension(), source.pos(), false);
+                if (container == null) continue;
+                boolean changed = false;
+                for (int k = 0; k < container.size() && remaining > 0; k++) {
+                    ItemStack box = container.getStack(k);
+                    if (box.getCount() != 1) continue;
+                    DefaultedList<ItemStack> contents = ShulkerUtil.getContents(box);
+                    if (contents == null) continue;
+                    boolean boxChanged = false;
+                    for (int j = 0; j < contents.size() && remaining > 0; j++) {
+                        ItemStack inner = contents.get(j);
+                        if (!same(inner, want)) continue;
+                        int n = Math.min(remaining, inner.getCount());
+                        result = merge(result, inner.split(n));
+                        remaining -= n;
+                        boxChanged = true;
+                    }
+                    if (boxChanged) {
+                        ShulkerUtil.setContents(box, contents);
+                        changed = true;
+                    }
+                }
+                if (changed) container.markDirty();
+            }
         }
         return result;
     }

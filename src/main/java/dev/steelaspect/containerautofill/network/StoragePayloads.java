@@ -50,6 +50,29 @@ public final class StoragePayloads {
     }
 
     /**
+     * Like {@link Take}, but from slot {@code innerSlot} of the shulker box lying in container slot {@code slot}.
+     * Answered with {@link Taken} (its slot is the container slot). A server without this channel can't do it.
+     */
+    public record TakeFromShulker(int requestId, Identifier dimension, BlockPos pos, int slot, int innerSlot, int count, boolean toHand)
+            implements CustomPayload {
+        public static final Id<TakeFromShulker> ID = new Id<>(id("take_from_shulker"));
+        public static final PacketCodec<RegistryByteBuf, TakeFromShulker> CODEC = PacketCodec.tuple(
+                PacketCodecs.VAR_INT, TakeFromShulker::requestId,
+                Identifier.PACKET_CODEC, TakeFromShulker::dimension,
+                BlockPos.PACKET_CODEC, TakeFromShulker::pos,
+                PacketCodecs.VAR_INT, TakeFromShulker::slot,
+                PacketCodecs.VAR_INT, TakeFromShulker::innerSlot,
+                PacketCodecs.VAR_INT, TakeFromShulker::count,
+                PacketCodecs.BOOLEAN, TakeFromShulker::toHand,
+                TakeFromShulker::new);
+
+        @Override
+        public Id<? extends CustomPayload> getId() {
+            return ID;
+        }
+    }
+
+    /**
      * Answer to {@link Take}, sent after the player's inventory has been synced: how many items were moved
      * (0 if the slot was empty or the container couldn't be reached), so the client never waits on a miss.
      */

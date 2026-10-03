@@ -1,6 +1,6 @@
 # Cytra Container
 
-A Fabric mod for **Minecraft Java 1.21.11** by **steelaspect**. Version **1.1.2**, one jar (`cytra-container-1.1.2.jar`) for the client and, optionally, the server.
+A Fabric mod for **Minecraft Java 1.21.11** by **steelaspect**. Version **1.2.0**, one jar (`cytra-container-1.2.0.jar`) for the client and, optionally, the server.
 
 It brings together the behaviour of two mods, without needing either of them installed:
 
@@ -66,7 +66,10 @@ Look at a schematic container and press **V**. With **Instant Fill** on (the def
 
 1. your inventory,
 2. shulker boxes in your inventory,
-3. your linked containers (any distance, while their chunk is loaded).
+3. your linked containers (any distance, while their chunk is loaded),
+4. shulker boxes stored in your linked containers.
+
+Both shulker steps follow *Use Shulker Boxes*.
 
 Double chests, crafter slot locks and *Clear Wrong Items* are handled the same way as the click-based fill. The action bar shows "Filled X slots, Y items missing" and chat lists what's missing.
 
@@ -77,6 +80,7 @@ Double chests, crafter slot locks and *Clear Wrong Items* are handled the same w
 Instant Fill and Area Fill need singleplayer/LAN, or a Fabric server that also runs this mod. Without either (or with Instant Fill turned off), `V` falls back to the original behaviour from Litematica-Container-Filler: it opens the container, fills it with clicks and closes it again (*Close After Look Fill*).
 
 ### 4. TakeItOut behaviour (shulker retrieval)
+- **Turn it off on its own:** *Enable TakeItOut* at the top of the TakeItOut tab (on by default, optional toggle key). When it's off, nothing is pulled into your hand: no pulls from shulker boxes or linked containers on pick block or easy place, no Single-item Buffer top-ups and no Hotbar Refill. Fills, the highlight, the storage menu and Restock keep working. Fills still take from shulker boxes unless *Use Shulker Boxes* is off too.
 - **Pick block from shulkers.** If you pick a block with vanilla middle-click, Litematica's schematic pick-block or easy place, and you don't carry it loose, the mod pulls it from a shulker box in your inventory into your hand.
 - **Nothing is pulled just by looking at a block.** Items are only pulled when you use easy place or pick block (plus Hotbar Refill, Restock and the fills). TakeItOut's "Auto Take Out" look-to-pull mode was removed.
 - It respects Litematica's `pickBlockableSlots` setting.
@@ -101,9 +105,10 @@ Link containers once, then take items from them, or put items into them, **from 
   - *Settings*, *Refresh*, *Look At* (marks the containers holding the selected item for 10 s) and *Sort* (name or count).
 - **Dump:** mark containers as dump targets (*Mark Dump Container*), then *Dump to Containers* moves your main inventory (not the hotbar) into them.
 - **Outlines:** linked containers are outlined in green and dump containers in orange. You can toggle this and change the colours.
+- **Shulker boxes inside linked containers:** items in a shulker box that's stored in a linked chest count as linked storage too. The storage menu lists and counts them, and pick block, easy place, Hotbar Refill, the menu and the fills can take from them. The server takes the items out and leaves the box in the chest. Loose items in linked containers are always used first. Stacked shulker boxes are skipped. This needs Cytra Container 1.2.0 or newer **on the server**; with an older server jar the client just doesn't use them.
 - **Pulling from storage:** auto-fill, pick block and easy place pull missing items from linked containers too. *Single-item Mode* (`B`) makes pick block and easy place take a few items instead of a full stack: *Single-item Buffer* (default 3) sets how many. While you hold easy place, the next few are pulled before you run out, so placing doesn't wait for the server. You may end up with up to that many spare items. Set it to 1 for strictly one item per pull (slower on servers with high ping).
 - **Speed:** pulled items are used the moment they arrive. With easy place, the block is placed as soon as the item reaches your hand, without waiting for the next click or tick. The server sends the item straight away and says if a slot turned out to be empty, so the next container is tried at once instead of after a 3 second wait. Pulls for different items can run at the same time. It also fixes a bug where, in single-item mode, the server sometimes didn't tell the client a new item had arrived, so an extra item was pulled and left in the inventory. On a server, single-item mode still needs one round trip per block, so it's limited by your ping.
-- **Hotbar Refill** (on by default, TakeItOut tab, optional toggle key): when placing a block or using an item (pearls, snowballs...) uses up the last one in your hand, the slot is refilled with the same item. It looks in the rest of your inventory first, then shulker boxes you carry, then linked containers. Dropping an item doesn't trigger it, and it's off in creative and while Litematica's easy place is on (easy place picks its own items). Tools that break aren't refilled.
+- **Hotbar Refill** (on by default, TakeItOut tab, optional toggle key): when placing a block or using an item (pearls, snowballs...) uses up the last one in your hand, the slot is refilled with the same item. It looks in the rest of your inventory first, then shulker boxes you carry, then linked containers and the shulker boxes stored in them. Dropping an item doesn't trigger it, and it's off in creative and while Litematica's easy place is on (easy place picks its own items). Tools that break aren't refilled.
 - Links are saved per world/server in `config/containerautofill/storage/`. There's no limit on how many containers you link.
 
 ### 6. Restock
@@ -154,9 +159,10 @@ None of these defaults clash with vanilla, Litematica or MaLiLib defaults.
 | Instant Fill | on | `V` fills the container server-side in one go without opening it. |
 | Click Delay (ticks) | 1 | Ticks between automated clicks. 1 means one click per tick. Raise it if a server complains about fast clicking. |
 | Clear Wrong Items | **off** | Shift-click unexpected items out of the container before filling. |
-| Use TakeItOut Sources (TakeItOut tab) | on | Use shulker retrieval while auto-filling. |
+| Use TakeItOut Sources (TakeItOut tab) | on | While filling, use shulker boxes in your inventory and shulker boxes stored in linked containers. |
 | Match Shulker Boxes By Content | off | A shulker box in a container slot counts as correct if its contents match (from LCF). |
 | Close After Look Fill | on | Close the container after *Fill Looked At Container*. |
+| Enable TakeItOut (TakeItOut tab) | on | Switch for the TakeItOut part only: when off, nothing is pulled into your hand (pick block, easy place, Single-item Buffer, Hotbar Refill). Fills, highlight, storage menu and Restock keep working. Optional toggle key. |
 | Pick Block From Shulkers (TakeItOut tab) | on | TakeItOut's pick-block behaviour. |
 | Hotbar Refill (TakeItOut tab) | on | Refill the hand's hotbar slot when its last item is placed or used. |
 | Single-item Buffer (TakeItOut tab) | 3 | In Single-item Mode, how many items each pull from linked storage takes; easy place tops up before you run out. 1 = strictly one item. |
