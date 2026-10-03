@@ -1,5 +1,6 @@
 plugins {
     id 'fabric-loom' version "${loom_version}"
+    id 'com.modrinth.minotaur' version '2.10.0'
 }
 
 version = project.mod_version
@@ -113,5 +114,25 @@ jar {
     }
     from('COPYING.GPL') {
         rename { "${it}_${archiveSuffix}" }
+    }
+}
+
+// Modrinth upload: `./gradlew modrinth` with the MODRINTH_TOKEN environment variable set (a Modrinth token with the
+// CREATE_VERSION scope). Changelog text comes from -Pchangelog="..."; add -PmodrinthDryRun to print the upload
+// without sending it. Fails if this version number is already on Modrinth.
+modrinth {
+    projectId = project.modrinth_project
+    versionNumber = project.mod_version
+    versionName = "Cytra Container ${project.mod_version}"
+    uploadFile = remapJar
+    gameVersions = [project.minecraft_version]
+    loaders = ['fabric']
+    changelog = project.findProperty('changelog') ?: "Cytra Container ${project.mod_version}"
+    debugMode = project.hasProperty('modrinthDryRun')
+    dependencies {
+        required.project 'fabric-api'
+        // Client-side only: needed for the schematic container fill, not for shulker pulling.
+        optional.project 'litematica'
+        optional.project 'malilib'
     }
 }
