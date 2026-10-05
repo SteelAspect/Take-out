@@ -63,6 +63,8 @@ public class ContainerAutoFillClient implements ClientModInitializer {
             }
         });
         ClientPlayNetworking.registerGlobalReceiver(FillPayloads.Result.ID, (payload, context) -> InstantFill.onResult(context.client(), payload));
+        ClientPlayNetworking.registerGlobalReceiver(dev.steelaspect.containerautofill.network.MaterialPayloads.Result.ID,
+                (payload, context) -> dev.steelaspect.containerautofill.storage.MaterialPull.onResult(context.client(), payload));
         ClientPlayNetworking.registerGlobalReceiver(SharedGroupPayloads.GroupList.ID, (payload, context) -> SharedGroups.onList(context.client(), payload));
         ClientPlayNetworking.registerGlobalReceiver(SharedGroupPayloads.GroupData.ID, (payload, context) -> SharedGroups.onData(context.client(), payload));
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> StorageStore.load(client));
@@ -78,6 +80,7 @@ public class ContainerAutoFillClient implements ClientModInitializer {
             Restock.reset();
             StorageContents.clear();
             SharedGroups.reset();
+            dev.steelaspect.containerautofill.storage.MaterialPull.reset();
             StorageStore.unload();
         });
     }

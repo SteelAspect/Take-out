@@ -83,6 +83,10 @@ public final class InputHandler implements IKeybindProvider, IHotkeyCallback {
                     ? "containerautofill.message.option_on" : "containerautofill.message.option_off", option.getPrettyName()), true);
             return true;
         }
+        if (key == Configs.PULL_MATERIALS.getKeybind()) {
+            dev.steelaspect.containerautofill.storage.MaterialPull.start(client);
+            return true;
+        }
         if (key == Configs.OPEN_STORAGE_MENU.getKeybind()) {
             StorageScreen.open(client);
             return true;

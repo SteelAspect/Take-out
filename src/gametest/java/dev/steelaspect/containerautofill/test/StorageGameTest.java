@@ -91,6 +91,7 @@ public class StorageGameTest implements FabricClientGameTest {
             testAreaFillAndServerStatus(context, world);
             testCreativeFill(context, world);
             testShulkersInLinkedChests(context, world);
+            testGetMaterials(context, world);
             testLookAtAndGroups(context);
         }
 
@@ -315,6 +316,29 @@ public class StorageGameTest implements FabricClientGameTest {
         } catch (Throwable t) {
             check("S8 pick block pulls the block from a linked container into the hand", false, "main hand empty");
         }
+
+        // S8b: full inventory: the hand stack goes into the chest slot the gold block came from.
+        Map<Integer, ItemStack> full = new java.util.HashMap<>();
+        for (int i = 0; i < 36; i++) full.put(i, stack(Items.COBBLESTONE, 64));
+        world.getServer().runOnServer(server -> fill(server.getOverworld(), chestB, Map.of(5, stack(Items.GOLD_BLOCK, 5))));
+        setPlayerInventory(world, full);
+        context.runOnClient(client -> StorageActions.refreshAll());
+        lookAt(context, world, goldBlock);
+        context.waitFor(client -> client.player.getInventory().getStack(35).isOf(Items.COBBLESTONE), 40);
+        context.getInput().pressKey(options -> options.pickItemKey);
+        try {
+            context.waitFor(client -> client.player.getMainHandStack().isOf(Items.GOLD_BLOCK), 100);
+        } catch (Throwable ignored) {
+        }
+        check("S8b full inventory: pick block swaps the hand item into the linked chest",
+                context.computeOnClient(client -> client.player.getMainHandStack().isOf(Items.GOLD_BLOCK))
+                        && containerCount(world, chestB, Items.COBBLESTONE) == 64,
+                "hand=" + context.computeOnClient(client -> client.player.getMainHandStack().toString()) + " chestB cobble=" + containerCount(world, chestB, Items.COBBLESTONE));
+        world.getServer().runOnServer(server -> {
+            Inventory inv = (Inventory) server.getOverworld().getBlockEntity(chestB);
+            for (int i = 0; i < inv.size(); i++) if (inv.getStack(i).isOf(Items.COBBLESTONE)) inv.setStack(i, ItemStack.EMPTY);
+        });
+        setPlayerInventory(world, Map.of());
     }
 
     /** P1-P4: how quickly single-item pulls and easy place with single-item mode run (ticks are logged). */
@@ -479,6 +503,25 @@ public class StorageGameTest implements FabricClientGameTest {
         check("R5 dropping the last item does not refill", dropped, "slot 0 refilled after a drop: " + context.computeOnClient(client ->
                 client.player.getInventory().getStack(0) + " / slot20 " + client.player.getInventory().getStack(20)));
         world.getServer().runCommand("kill @e[type=item]");
+
+        // W1-W4: emptying a bucket (placing water, or into a cauldron, where the server turns it empty) brings a full one back.
+        bucketCase(context, world, target, "W1 placing water: water bucket refilled from the inventory (empty bucket moved out)", false,
+                Map.of(0, stack(Items.WATER_BUCKET, 1), 20, stack(Items.WATER_BUCKET, 1)), true,
+                c -> c.player.getInventory().getStack(0).isOf(Items.WATER_BUCKET) && c.player.getInventory().getStack(20).isOf(Items.BUCKET));
+        bucketCase(context, world, target, "W2 filling a cauldron: water bucket refilled from a shulker box in the inventory", true,
+                Map.of(0, stack(Items.WATER_BUCKET, 1), 10, shulkerWith(null, 5, stack(Items.WATER_BUCKET, 1))), true,
+                c -> c.player.getInventory().getStack(0).isOf(Items.WATER_BUCKET) && clientHas(c, Items.BUCKET, 1));
+        check("W2 the shulker box gave up its water bucket", innerCount(world, false, 10, Items.WATER_BUCKET) == 0,
+                "box=" + innerCount(world, false, 10, Items.WATER_BUCKET));
+        bucketCase(context, world, target, "W3 lava bucket refilled too", true,
+                Map.of(0, stack(Items.LAVA_BUCKET, 1), 20, stack(Items.LAVA_BUCKET, 1)), true,
+                c -> c.player.getInventory().getStack(0).isOf(Items.LAVA_BUCKET) && c.player.getInventory().getStack(20).isOf(Items.BUCKET));
+        context.runOnClient(client -> Configs.REFILL_BUCKETS.setBooleanValue(false));
+        bucketCase(context, world, target, "W4 Refill Water Buckets off: the empty bucket stays", true,
+                Map.of(0, stack(Items.WATER_BUCKET, 1), 20, stack(Items.WATER_BUCKET, 1)), false,
+                c -> c.player.getInventory().getStack(0).isOf(Items.BUCKET) && c.player.getInventory().getStack(20).isOf(Items.WATER_BUCKET));
+        context.runOnClient(client -> Configs.REFILL_BUCKETS.setBooleanValue(true));
+        world.getServer().runOnServer(server -> server.getOverworld().setBlockState(target, Blocks.OBSIDIAN.getDefaultState()));
     }
 
     private static ItemStack shulkerWith(String name, int innerSlot, ItemStack content) {
@@ -668,6 +711,48 @@ public class StorageGameTest implements FabricClientGameTest {
         });
     }
 
+    /**
+     * Empties the bucket in hotbar slot 0 and checks what's in the hand after: into a cauldron at {@code target}
+     * (the server turns the bucket empty), or onto the obsidian there (placing the liquid in front of it).
+     */
+    private void bucketCase(ClientGameTestContext context, TestSingleplayerContext world, BlockPos target, String name, boolean cauldron,
+                            Map<Integer, ItemStack> inventory, boolean expectRefill, Predicate<MinecraftClient> done) {
+        world.getServer().runOnServer(server -> {
+            for (Direction d : Direction.values()) server.getOverworld().setBlockState(target.offset(d), Blocks.AIR.getDefaultState());
+            server.getOverworld().setBlockState(target.down(), Blocks.STONE_BRICKS.getDefaultState());
+            server.getOverworld().setBlockState(target, cauldron ? Blocks.CAULDRON.getDefaultState() : Blocks.OBSIDIAN.getDefaultState());
+        });
+        setPlayerInventory(world, inventory);
+        lookAt(context, world, target);
+        try {
+            context.waitFor(client -> !client.player.getInventory().getStack(0).isEmpty(), 40);
+        } catch (Throwable t) {
+            check(name, false, "inventory not set up");
+            return;
+        }
+        context.getInput().pressKey(options -> options.useKey);
+        boolean ok;
+        if (expectRefill) {
+            try {
+                context.waitFor(done, 60);
+                ok = true;
+            } catch (Throwable t) {
+                ok = false;
+            }
+        } else {
+            context.waitTicks(20);
+            ok = context.computeOnClient(done::test);
+        }
+        String state = context.computeOnClient(client -> client.player.getInventory().getStack(0) + " / slot20 " + client.player.getInventory().getStack(20));
+        check(name, ok, "hotbar 0 = " + state);
+        context.waitTicks(5);
+        // Placed water or lava would spread into later tests' spots.
+        world.getServer().runCommand(String.format(Locale.ROOT, "fill %d %d %d %d %d %d air replace water",
+                target.getX() - 8, target.getY() - 1, target.getZ() - 8, target.getX() + 8, target.getY() + 2, target.getZ() + 8));
+        world.getServer().runCommand(String.format(Locale.ROOT, "fill %d %d %d %d %d %d air replace lava",
+                target.getX() - 8, target.getY() - 1, target.getZ() - 8, target.getX() + 8, target.getY() + 2, target.getZ() + 8));
+    }
+
     private void refillCase(ClientGameTestContext context, TestSingleplayerContext world, BlockPos target, String name,
                             Map<Integer, ItemStack> inventory, boolean expectRefill, Predicate<MinecraftClient> done) {
         world.getServer().runOnServer(server -> {
@@ -701,7 +786,11 @@ public class StorageGameTest implements FabricClientGameTest {
             context.waitTicks(15);
             ok = context.computeOnClient(done::test);
         }
-        String state = context.computeOnClient(client -> client.player.getInventory().getStack(0) + " / slot20 " + client.player.getInventory().getStack(20));
+        String state = context.computeOnClient(client -> client.player.getInventory().getStack(0) + " / slot20 " + client.player.getInventory().getStack(20)
+                + " | target " + client.world.getBlockState(target) + " south " + client.world.getBlockState(target.south())
+                + " | player " + client.player.getBlockPos() + " yaw " + client.player.getYaw() + " pitch " + client.player.getPitch()
+                + " | crosshair " + client.crosshairTarget + (client.crosshairTarget instanceof net.minecraft.util.hit.BlockHitResult b ? " " + b.getBlockPos() + " " + b.getSide() : "")
+                + " | screen " + client.currentScreen + " using " + client.player.isUsingItem());
         check(name, ok, "hotbar 0 = " + state);
         context.waitTicks(5); // let the server finish the refill before the next case resets the inventory
     }
@@ -1046,6 +1135,74 @@ public class StorageGameTest implements FabricClientGameTest {
         check("N7 the shulker boxes themselves stay in the chest", boxes == 4, "boxes=" + boxes);
         context.runOnClient(client -> StorageStore.remove(StorageStore.find(overworld, boxChest)));
         setPlayerInventory(world, Map.of());
+    }
+
+    /** M1-M4: Get Materials (Litematica material list into the carried shulker boxes). */
+    private void testGetMaterials(ClientGameTestContext context, TestSingleplayerContext world) {
+        // M1: wants come from Litematica's material list: break the placed hopper, so one hopper is missing.
+        world.getServer().runOnServer(server -> server.getOverworld().setBlockState(fillHopper, Blocks.AIR.getDefaultState()));
+        context.waitTicks(5);
+        context.runOnClient(client -> {
+            var placement = DataManager.getSchematicPlacementManager().getAllSchematicsPlacements().get(0);
+            DataManager.setMaterialList(new fi.dy.masa.litematica.materials.MaterialListPlacement(placement, true));
+        });
+        try {
+            context.waitFor(client -> !DataManager.getMaterialList().getMaterialsAll().isEmpty(), 200);
+        } catch (Throwable ignored) {
+        }
+        var wants = context.computeOnClient(client -> dev.steelaspect.containerautofill.storage.MaterialPull.wantsFromMaterialList(client, DataManager.getMaterialList()));
+        check("M1 material list wants include the missing hopper", wants.stream().anyMatch(w -> w.kind().isOf(Items.HOPPER) && w.count() == 1),
+                "wants=" + wants);
+        world.getServer().runOnServer(server -> server.getOverworld().setBlockState(fillHopper, Blocks.HOPPER.getDefaultState()));
+
+        // M2-M3: pull into carried boxes from a linked chest (loose + in a shulker box there).
+        BlockPos source = chestA.add(8, 0, 2);
+        world.getServer().runOnServer(server -> {
+            server.getOverworld().setBlockState(source, Blocks.CHEST.getDefaultState());
+            fill(server.getOverworld(), source, Map.of(0, stack(Items.BRICKS, 64), 1, stack(Items.BRICKS, 36),
+                    2, shulkerWith(null, 3, stack(Items.OAK_PLANKS, 30))));
+        });
+        setPlayerInventory(world, Map.of(10, shulkerWith(null, 0, stack(Items.BRICKS, 5)), 11, new ItemStack(Items.WHITE_SHULKER_BOX)));
+        context.runOnClient(client -> {
+            StorageStore.link(overworld, source);
+            StorageActions.refreshAll();
+        });
+        context.waitTicks(30);
+        var before = context.computeOnClient(client -> dev.steelaspect.containerautofill.storage.MaterialPull.lastResult());
+        context.runOnClient(client -> dev.steelaspect.containerautofill.storage.MaterialPull.pull(client, List.of(
+                new dev.steelaspect.containerautofill.network.MaterialPayloads.Want(stack(Items.BRICKS, 1), 80),
+                new dev.steelaspect.containerautofill.network.MaterialPayloads.Want(stack(Items.OAK_PLANKS, 1), 20),
+                new dev.steelaspect.containerautofill.network.MaterialPayloads.Want(stack(Items.DIAMOND, 1), 5))));
+        try {
+            context.waitFor(client -> dev.steelaspect.containerautofill.storage.MaterialPull.lastResult() != before, 100);
+        } catch (Throwable ignored) {
+        }
+        var result = context.computeOnClient(client -> dev.steelaspect.containerautofill.storage.MaterialPull.lastResult());
+        int bricks = innerCount(world, false, 10, Items.BRICKS) + innerCount(world, false, 11, Items.BRICKS);
+        int planks = innerCount(world, false, 10, Items.OAK_PLANKS) + innerCount(world, false, 11, Items.OAK_PLANKS);
+        check("M2 materials moved into the carried shulker boxes (bricks topped up 5 -> 85, 20 planks from a box in the chest)",
+                bricks == 85 && planks == 20 && containerCount(world, source, Items.BRICKS) == 20
+                        && boxCount(world, source, 2, Items.OAK_PLANKS) == 10,
+                "bricks=" + bricks + " planks=" + planks + " chest bricks=" + containerCount(world, source, Items.BRICKS)
+                        + " chest box planks=" + boxCount(world, source, 2, Items.OAK_PLANKS));
+        check("M3 what isn't anywhere is reported missing (5 diamonds)", result != null && result.moved() == 100
+                && result.missing().size() == 1 && result.missing().get(0).kind().isOf(Items.DIAMOND) && result.missing().get(0).count() == 5,
+                "result=" + result);
+
+        // M4: no shulker boxes carried.
+        setPlayerInventory(world, Map.of());
+        context.waitTicks(5);
+        var beforeNone = context.computeOnClient(client -> dev.steelaspect.containerautofill.storage.MaterialPull.lastResult());
+        context.runOnClient(client -> dev.steelaspect.containerautofill.storage.MaterialPull.pull(client, List.of(
+                new dev.steelaspect.containerautofill.network.MaterialPayloads.Want(stack(Items.BRICKS, 1), 5))));
+        try {
+            context.waitFor(client -> dev.steelaspect.containerautofill.storage.MaterialPull.lastResult() != beforeNone, 100);
+        } catch (Throwable ignored) {
+        }
+        var none = context.computeOnClient(client -> dev.steelaspect.containerautofill.storage.MaterialPull.lastResult());
+        check("M4 no shulker boxes carried: nothing moved, said so", none != null && none.noBoxes() && none.moved() == 0
+                && containerCount(world, source, Items.BRICKS) == 20, "result=" + none);
+        context.runOnClient(client -> StorageStore.remove(StorageStore.find(overworld, source)));
     }
 
     /** How many of {@code item} the shulker box in a container slot holds. */

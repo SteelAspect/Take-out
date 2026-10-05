@@ -169,7 +169,13 @@ public class StorageScreen extends Screen {
 
     private void initItems() {
         int left = this.width / 2 - panelWidth() / 2;
-        TextFieldWidget field = new TextFieldWidget(this.textRenderer, left, 40, panelWidth(), 18, Text.translatable("containerautofill.storage.search"));
+        TextFieldWidget field = new TextFieldWidget(this.textRenderer, left, 40, panelWidth() - 104, 18, Text.translatable("containerautofill.storage.search"));
+        ButtonWidget materials = ButtonWidget.builder(Text.translatable("containerautofill.storage.get_materials"), b -> {
+            MaterialPull.start(this.client);
+            this.close();
+        }).dimensions(left + panelWidth() - 100, 40, 100, 18).build();
+        materials.setTooltip(net.minecraft.client.gui.tooltip.Tooltip.of(Text.translatable("containerautofill.config.comment.pullMaterials")));
+        this.addDrawableChild(materials);
         field.setPlaceholder(Text.translatable("containerautofill.storage.search").formatted(Formatting.DARK_GRAY));
         field.setText(search);
         field.setChangedListener(text -> {

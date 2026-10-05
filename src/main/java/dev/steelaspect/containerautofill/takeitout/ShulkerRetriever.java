@@ -93,6 +93,14 @@ public final class ShulkerRetriever {
 
     /** Requests one stack matching {@code wanted} (same item and components) from an inventory shulker. */
     public static Outcome request(MinecraftClient client, ItemStack wanted, Predicate<ItemStack> matcher) {
+        return request(client, wanted, matcher, false);
+    }
+
+    /**
+     * @param allowSwap with a full inventory, let the server make room the way TakeItOut does: a block from the
+     *                  inventory goes into the box in place of the item taken out (pick block / easy place only)
+     */
+    public static Outcome request(MinecraftClient client, ItemStack wanted, Predicate<ItemStack> matcher, boolean allowSwap) {
         if (client.player == null || wanted.isEmpty()) return Outcome.NOT_FOUND;
         if (pending != null) return Outcome.BUSY;
 
@@ -114,7 +122,9 @@ public final class ShulkerRetriever {
         }
 
         int free = inventory.getEmptySlot();
-        if (free < 0 || free >= ShulkerUtil.PLAYER_MAIN_SLOTS) return Outcome.INVENTORY_FULL;
+        // No empty slot: the hand item can still go into a matching stack or the box itself (server decides).
+        if ((free < 0 || free >= ShulkerUtil.PLAYER_MAIN_SLOTS) && !(allowSwap
+                && (inventory.getSelectedStack().getItem().canBeNested() || hasSwappableItem(inventory)))) return Outcome.INVENTORY_FULL;
 
         ClientPlayNetworking.send(new GetStackPayload(location.innerSlot(), location.shulkerSlot()));
         pending = new Pending(location.stack().copyWithCount(1), countInInventory(inventory, matcher),
@@ -166,6 +176,14 @@ public final class ShulkerRetriever {
     }
 
     /** Round trip allowance if no answer comes: 2.5x the player's ping plus 200 ms, clamped to 0.5..10 seconds. */
+    /** Same rule as {@link ShulkerStackServerHandler}: a block (not a shulker box or ender chest) it can put into the box. */
+    private static boolean hasSwappableItem(PlayerInventory inventory) {
+        for (int i = 0; i < ShulkerUtil.PLAYER_MAIN_SLOTS; i++) {
+            if (ShulkerStackServerHandler.canTradeIntoShulker(inventory.getStack(i))) return true;
+        }
+        return false;
+    }
+
     public static int timeoutTicks(MinecraftClient client) {
         int pingMs = 0;
         if (client.getNetworkHandler() != null && client.player != null) {

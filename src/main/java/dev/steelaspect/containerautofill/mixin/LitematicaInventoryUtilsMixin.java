@@ -25,7 +25,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class LitematicaInventoryUtilsMixin {
     @Inject(method = "schematicWorldPickBlock", at = @At("HEAD"), cancellable = true)
     private static void containerautofill$pickFromShulker(ItemStack stack, BlockPos pos, World schematicWorld, MinecraftClient mc, CallbackInfo ci) {
-        if (TakeItOutFeatures.onSchematicPickBlock(stack, mc)) {
+        if (TakeItOutFeatures.onSchematicPickBlock(stack, pos, mc)) {
             ci.cancel();
         }
     }

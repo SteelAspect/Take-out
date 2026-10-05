@@ -14,6 +14,7 @@ import dev.steelaspect.containerautofill.highlight.HighlightRenderer;
 import dev.steelaspect.containerautofill.takeitout.GetStackPayload;
 import dev.steelaspect.containerautofill.takeitout.ShulkerRetriever;
 import dev.steelaspect.containerautofill.takeitout.ShulkerStackServerHandler;
+import dev.steelaspect.containerautofill.takeitout.TakeItOutFeatures;
 import fi.dy.masa.litematica.data.DataManager;
 import fi.dy.masa.litematica.schematic.LitematicaSchematic;
 import fi.dy.masa.litematica.schematic.placement.SchematicPlacement;
@@ -109,6 +110,8 @@ public class ContainerAutoFillClientGameTest implements FabricClientGameTest {
             testVanillaPickFromShulker(context, world);
             testNoPullOnLook(context, world);
             testTakeItOutOff(context, world);
+            testEasyPlacePulls(context, world);
+            testPrinterPulls(context, world);
             testMoreContainerTypes(context, world);
         }
 
@@ -648,6 +651,114 @@ public class ContainerAutoFillClientGameTest implements FabricClientGameTest {
         } catch (Throwable t) {
             fail("C29 TakeItOut back on: schematic pick block pulls again", "lapis block never arrived");
         }
+    }
+
+    /** C30-C32: hotbar slot outside Pick Blockable Slots, full inventory, and Litematica's fail message. */
+    private void testEasyPlacePulls(ClientGameTestContext context, TestSingleplayerContext world) {
+        context.runOnClient(client -> fi.dy.masa.litematica.config.Configs.Generic.PICK_BLOCKABLE_SLOTS.setValueFromString("1-5"));
+        setPlayerInventory(world, Map.of(9, shulkerWith(Items.BLUE_SHULKER_BOX, 0, stack(Items.LAPIS_BLOCK, 5))));
+        lookAt(context, world, lapisSpot);
+        context.runOnClient(client -> client.player.getInventory().setSelectedSlot(7));
+        context.waitTicks(2);
+        boolean quiet = context.computeOnClient(client -> {
+            fi.dy.masa.litematica.util.WorldUtils.doSchematicWorldPickBlock(true, client);
+            return !TakeItOutFeatures.allowEasyPlaceFailMessage();
+        });
+        check("C32 Litematica's 'Action prevented' message is skipped while the block is fetched", quiet, "message allowed");
+        for (Class<?> target : new Class<?>[]{fi.dy.masa.litematica.util.WorldUtils.class, fi.dy.masa.litematica.util.EasyPlaceUtils.class}) {
+            boolean hooked = java.util.Arrays.stream(target.getDeclaredMethods()).anyMatch(m -> m.getName().contains("containerautofill$actionbar"));
+            check("C33 message hook applied to " + target.getSimpleName(), hooked, "no handler method in the class");
+        }
+        try {
+            context.waitFor(client -> clientHas(client, Items.LAPIS_BLOCK), 100);
+        } catch (Throwable ignored) {
+        }
+        check("C30 selected slot 8 isn't pick-blockable: the block lands in an allowed slot (1-5)", context.computeOnClient(client ->
+                client.player.getInventory().getSelectedSlot() < 5 && client.player.getMainHandStack().isOf(Items.LAPIS_BLOCK)),
+                context.computeOnClient(client -> "slot=" + client.player.getInventory().getSelectedSlot() + " hand=" + client.player.getMainHandStack()));
+
+        Map<Integer, ItemStack> full = new java.util.HashMap<>();
+        for (int i = 0; i < 36; i++) full.put(i, stack(Items.DIRT, 64));
+        full.put(9, shulkerWith(Items.BLUE_SHULKER_BOX, 0, stack(Items.LAPIS_BLOCK, 5)));
+        setPlayerInventory(world, full);
+        lookAt(context, world, lapisSpot);
+        context.waitFor(client -> client.player.getInventory().getStack(35).isOf(Items.DIRT), 40);
+        context.runOnClient(client -> fi.dy.masa.litematica.util.WorldUtils.doSchematicWorldPickBlock(true, client));
+        try {
+            context.waitFor(client -> client.player.getMainHandStack().isOf(Items.LAPIS_BLOCK), 100);
+        } catch (Throwable ignored) {
+        }
+        check("C31 full inventory: the block is still fetched (a dirt stack goes into the shulker box instead)",
+                context.computeOnClient(client -> client.player.getMainHandStack().isOf(Items.LAPIS_BLOCK)),
+                context.computeOnClient(client -> "hand=" + client.player.getMainHandStack()));
+        pullWithFullInventory(context, world, "C34 full inventory: the hand stack merges into a matching stack",
+                stack(Items.COBBLESTONE, 10), 20, stack(Items.COBBLESTONE, 20),
+                () -> serverStack(world, 20).isOf(Items.COBBLESTONE) && serverStack(world, 20).getCount() == 30);
+        pullWithFullInventory(context, world, "C35 full inventory: a non-block hand item (sticks) goes into the shulker box",
+                stack(Items.STICK, 5), 20, stack(Items.DIRT, 64),
+                () -> world.getServer().computeOnServer(server -> {
+                    var c = player(server).getInventory().getStack(9).get(net.minecraft.component.DataComponentTypes.CONTAINER);
+                    return c != null && c.stream().anyMatch(i -> i.isOf(Items.STICK));
+                }));
+        context.runOnClient(client -> fi.dy.masa.litematica.config.Configs.Generic.PICK_BLOCKABLE_SLOTS.setValueFromString("1,2,3,4,5"));
+        setPlayerInventory(world, Map.of());
+    }
+
+    /** C36: Litematica Printer (dev/test runtime only) prints a block that is only in a carried shulker box. */
+    private void testPrinterPulls(ClientGameTestContext context, TestSingleplayerContext world) {
+        if (!net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("litematica_printer")) {
+            // Run with -PwithoutPrinter: the game started, and the printer hook was left out.
+            check("C36 without Litematica Printer: game starts, printer hook not added", true, "");
+            return;
+        }
+        fi.dy.masa.malilib.config.options.ConfigBoolean printMode;
+        try {
+            printMode = (fi.dy.masa.malilib.config.options.ConfigBoolean) Class.forName("me.aleksilassila.litematica.printer.config.Configs")
+                    .getField("PRINT_MODE").get(null);
+        } catch (ReflectiveOperationException e) {
+            check("C36 Litematica Printer present in the test run", false, e.toString());
+            return;
+        }
+        world.getServer().runOnServer(server -> server.getOverworld().setBlockState(lapisSpot, Blocks.AIR.getDefaultState()));
+        setPlayerInventory(world, Map.of(9, shulkerWith(Items.BLUE_SHULKER_BOX, 0, stack(Items.LAPIS_BLOCK, 5))));
+        lookAt(context, world, lapisSpot);
+        context.runOnClient(client -> printMode.setBooleanValue(true));
+        try {
+            context.waitFor(client -> client.world.getBlockState(lapisSpot).isOf(Blocks.LAPIS_BLOCK), 200);
+        } catch (Throwable ignored) {
+        }
+        context.waitTicks(20); // let the server handle the placement before reading it
+        context.runOnClient(client -> printMode.setBooleanValue(false));
+        boolean printed = world.getServer().computeOnServer(server -> server.getOverworld().getBlockState(lapisSpot).isOf(Blocks.LAPIS_BLOCK));
+        check("C36 printer prints a block fetched from a shulker box in the inventory", printed,
+                "block=" + world.getServer().computeOnServer(server -> server.getOverworld().getBlockState(lapisSpot).toString()));
+        world.getServer().runOnServer(server -> server.getOverworld().setBlockState(lapisSpot, Blocks.AIR.getDefaultState()));
+        setPlayerInventory(world, Map.of());
+    }
+
+    /** Inventory full of dirt, {@code hand} in slot 1, {@code extra} in {@code extraSlot}, lapis only in a shulker in slot 10. */
+    private void pullWithFullInventory(ClientGameTestContext context, TestSingleplayerContext world, String name, ItemStack hand,
+                                       int extraSlot, ItemStack extra, java.util.function.BooleanSupplier handWentRight) {
+        Map<Integer, ItemStack> full = new java.util.HashMap<>();
+        for (int i = 0; i < 36; i++) full.put(i, stack(Items.DIRT, 64));
+        full.put(0, hand);
+        full.put(extraSlot, extra);
+        full.put(9, shulkerWith(Items.BLUE_SHULKER_BOX, 0, stack(Items.LAPIS_BLOCK, 5)));
+        setPlayerInventory(world, full);
+        lookAt(context, world, lapisSpot);
+        context.waitFor(client -> client.player.getInventory().getStack(9).isOf(Items.BLUE_SHULKER_BOX), 40);
+        context.runOnClient(client -> fi.dy.masa.litematica.util.WorldUtils.doSchematicWorldPickBlock(true, client));
+        try {
+            context.waitFor(client -> client.player.getMainHandStack().isOf(Items.LAPIS_BLOCK), 100);
+        } catch (Throwable ignored) {
+        }
+        boolean lapis = context.computeOnClient(client -> client.player.getMainHandStack().isOf(Items.LAPIS_BLOCK));
+        check(name, lapis && handWentRight.getAsBoolean(), "hand=" + context.computeOnClient(client -> client.player.getMainHandStack().toString())
+                + " slot" + extraSlot + "=" + serverStack(world, extraSlot));
+    }
+
+    private ItemStack serverStack(TestSingleplayerContext world, int slot) {
+        return world.getServer().computeOnServer(server -> player(server).getInventory().getStack(slot).copy());
     }
 
     private Map<BlockPos, ContainerStatus> waitForStatuses(ClientGameTestContext context, Predicate<Map<BlockPos, ContainerStatus>> ready) {

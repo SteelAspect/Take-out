@@ -34,6 +34,11 @@ dependencies {
         modImplementation "maven.modrinth:litematica:${project.litematica_modrinth_id}"
     }
     modImplementation "maven.modrinth:malilib:${project.malilib_modrinth_id}"
+    // Litematica Printer (CC0) in dev/test runs only, for the printer pull hook. Never bundled or required.
+    // -PwithoutPrinter leaves it out, to check the game still starts without it.
+    if (!project.hasProperty('withoutPrinter')) {
+        modLocalRuntime "maven.modrinth:litematica-printer:${project.printer_modrinth_id}"
+    }
 }
 
 // MaLiLib ships conditional-mixin as a jar-in-jar. Loom doesn't unpack nested jars of Maven mods for

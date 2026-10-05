@@ -50,6 +50,8 @@ public class Configs implements IConfigHandler {
     public static final ConfigBooleanHotkeyed TAKEITOUT_ENABLED = new ConfigBooleanHotkeyed("takeItOutEnabled", true, "").apply(PREFIX);
     public static final ConfigBooleanHotkeyed SINGLE_ITEM_MODE = new ConfigBooleanHotkeyed("singleItemMode", false, "B").apply(PREFIX);
     public static final ConfigBooleanHotkeyed HOTBAR_REFILL = new ConfigBooleanHotkeyed("hotbarRefill", true, "").apply(PREFIX);
+    public static final ConfigBoolean REFILL_BUCKETS = new ConfigBoolean("refillBuckets", true).apply(PREFIX);
+    public static final ConfigBoolean PRINTER_PULLS = new ConfigBoolean("printerPulls", true).apply(PREFIX);
     public static final ConfigInteger SINGLE_ITEM_BUFFER = new ConfigInteger("singleItemBuffer", 3, 1, 16).apply(PREFIX);
     public static final ConfigBoolean USE_LINKED_CONTAINERS = new ConfigBoolean("useLinkedContainers", true).apply(PREFIX);
     public static final ConfigBooleanHotkeyed LINKED_OUTLINES = new ConfigBooleanHotkeyed("linkedOutlines", true, "").apply(PREFIX);
@@ -73,6 +75,8 @@ public class Configs implements IConfigHandler {
     public static final ImmutableList<IConfigBase> TAKEITOUT = ImmutableList.of(
             TAKEITOUT_ENABLED,
             HOTBAR_REFILL,
+            REFILL_BUCKETS,
+            PRINTER_PULLS,
             SINGLE_ITEM_MODE,
             SINGLE_ITEM_BUFFER,
             SHULKER_PICK_BLOCK,
@@ -144,6 +148,7 @@ public class Configs implements IConfigHandler {
     public static final ConfigHotkey AREA_FILL = new ConfigHotkey("areaFill", "LEFT_SHIFT,V").apply(PREFIX);
     public static final ConfigHotkey OPEN_CONFIG_GUI = new ConfigHotkey("openConfigGui", "L,C").apply(PREFIX);
     public static final ConfigHotkey OPEN_STORAGE_MENU = new ConfigHotkey("openStorageMenu", "Y").apply(PREFIX);
+    public static final ConfigHotkey PULL_MATERIALS = new ConfigHotkey("pullMaterials", "").apply(PREFIX);
     public static final ConfigHotkey LINK_LOOKED_AT = new ConfigHotkey("linkLookedAtContainer", "H").apply(PREFIX);
     public static final ConfigHotkey BOX_SELECT_CORNER = new ConfigHotkey("boxSelectCorner", "").apply(PREFIX);
     public static final ConfigHotkey MARK_DUMP_CONTAINER = new ConfigHotkey("markDumpContainer", "").apply(PREFIX);
@@ -155,6 +160,7 @@ public class Configs implements IConfigHandler {
             AREA_FILL,
             OPEN_CONFIG_GUI,
             OPEN_STORAGE_MENU,
+            PULL_MATERIALS,
             LINK_LOOKED_AT,
             BOX_SELECT_CORNER,
             MARK_DUMP_CONTAINER,

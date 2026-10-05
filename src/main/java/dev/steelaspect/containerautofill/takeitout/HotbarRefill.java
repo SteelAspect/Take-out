@@ -10,6 +10,7 @@ import dev.steelaspect.containerautofill.storage.StorageRetriever;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.entity.player.PlayerInventory;
 import net.minecraft.item.ItemStack;
+import net.minecraft.item.Items;
 import net.minecraft.screen.slot.SlotActionType;
 import net.minecraft.util.Hand;
 
@@ -20,6 +21,9 @@ import java.util.function.Predicate;
  * last one, the same hotbar slot is refilled with the same item (and components). Sources, in order:
  * the rest of the inventory, shulker boxes in the inventory, then linked containers.
  * Skipped in creative and while Litematica's easy place is on (it picks its own items).
+ * <p>
+ * Water and lava buckets don't empty the slot: they turn into an empty bucket. With Refill Water Buckets
+ * on, a full bucket is fetched the same way and the empty one moves to another slot.
  */
 public final class HotbarRefill {
     private static final int MAX_WAIT_TICKS = 5;
@@ -28,7 +32,13 @@ public final class HotbarRefill {
     private static int beforeSlot = -1;
     private static ItemStack wanted = ItemStack.EMPTY;
     private static int wantedSlot = -1;
+    /** The wanted item replaces an empty bucket rather than filling an empty slot. */
+    private static boolean wantedBucket;
     private static int waited;
+    /** A full bucket that was just used; the server may only turn it empty a few ticks later (e.g. a cauldron). */
+    private static ItemStack usedBucket = ItemStack.EMPTY;
+    private static int usedBucketSlot = -1;
+    private static int usedBucketTicks;
 
     private HotbarRefill() {
     }
@@ -48,7 +58,12 @@ public final class HotbarRefill {
         if (inventory.getSelectedSlot() == beforeSlot && client.player.getMainHandStack().isEmpty()) {
             wanted = before.copyWithCount(1);
             wantedSlot = beforeSlot;
+            wantedBucket = false;
             waited = 0;
+        } else if (isFullBucket(before)) {
+            usedBucket = before.copyWithCount(1);
+            usedBucketSlot = beforeSlot;
+            usedBucketTicks = 0;
         }
         before = ItemStack.EMPTY;
     }
@@ -56,22 +71,46 @@ public final class HotbarRefill {
     public static void reset() {
         before = ItemStack.EMPTY;
         wanted = ItemStack.EMPTY;
+        usedBucket = ItemStack.EMPTY;
+    }
+
+    private static boolean isFullBucket(ItemStack stack) {
+        return stack.isOf(Items.WATER_BUCKET) || stack.isOf(Items.LAVA_BUCKET);
+    }
+
+    /** Once the bucket that was just used shows up empty in its slot, ask for a full one. */
+    private static void watchUsedBucket(MinecraftClient client) {
+        if (usedBucket.isEmpty() || client.player == null) return;
+        PlayerInventory inventory = client.player.getInventory();
+        ItemStack inSlot = inventory.getStack(usedBucketSlot);
+        if (inventory.getSelectedSlot() == usedBucketSlot && inSlot.isOf(Items.BUCKET) && inSlot.getCount() == 1) {
+            wanted = usedBucket;
+            wantedSlot = usedBucketSlot;
+            wantedBucket = true;
+            waited = 0;
+            usedBucket = ItemStack.EMPTY;
+        } else if (!ItemStack.areItemsAndComponentsEqual(inSlot, usedBucket) || ++usedBucketTicks > ShulkerRetriever.timeoutTicks(client)) {
+            usedBucket = ItemStack.EMPTY; // still full after a while (nothing placed), or the slot changed
+        }
     }
 
     public static void tick(MinecraftClient client) {
+        watchUsedBucket(client);
         if (wanted.isEmpty()) return;
         ItemStack item = wanted;
         int slot = wantedSlot;
         wanted = ItemStack.EMPTY;
 
-        if (!TakeItOutFeatures.isOn() || !Configs.HOTBAR_REFILL.getBooleanValue()) return;
+        if (!TakeItOutFeatures.isOn() || !(wantedBucket ? Configs.REFILL_BUCKETS.getBooleanValue() : Configs.HOTBAR_REFILL.getBooleanValue())) return;
         if (client.player == null || client.interactionManager == null || client.player.isCreative()) return;
         if (fi.dy.masa.litematica.config.Configs.Generic.EASY_PLACE_MODE.getBooleanValue()) return;
         if (client.currentScreen != null || client.player.currentScreenHandler != client.player.playerScreenHandler) return;
 
         PlayerInventory inventory = client.player.getInventory();
-        // The slot must still be the empty, selected one (the player didn't switch or put something there).
-        if (inventory.getSelectedSlot() != slot || !inventory.getStack(slot).isEmpty()) return;
+        // The slot must still be the selected one, holding what using the item left there (nothing, or an
+        // empty bucket): the player didn't switch or put something else there.
+        ItemStack left = inventory.getStack(slot);
+        if (inventory.getSelectedSlot() != slot || !(wantedBucket ? left.isOf(Items.BUCKET) && left.getCount() == 1 : left.isEmpty())) return;
         if (dev.steelaspect.containerautofill.restock.Restock.isPending(slot)) {
             // Restock asked the server first; only step in if no restock box had the item.
             wanted = item;

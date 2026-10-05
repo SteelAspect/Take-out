@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.IntSupplier;
+import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
 
 /**
@@ -64,6 +65,7 @@ public final class StorageServerHandler {
         FillServerHandler.register();
         RestockServerHandler.register();
         SharedGroupsServerHandler.register();
+        MaterialServerHandler.register();
     }
 
     static Inventory inventoryAt(ServerPlayerEntity player, Identifier dimension, BlockPos pos, boolean announceLock) {
@@ -104,6 +106,11 @@ public final class StorageServerHandler {
             ItemStack rest = HopperBlockEntity.transfer(null, inventory, left, null);
             inventory.markDirty();
             return rest;
+        }, hand -> {
+            if (!inventory.getStack(request.slot()).isEmpty() || !inventory.isValid(request.slot(), hand)) return false;
+            inventory.setStack(request.slot(), hand);
+            inventory.markDirty();
+            return true;
         });
     }
 
@@ -139,24 +146,31 @@ public final class StorageServerHandler {
             ShulkerUtil.setContents(box, now);
             inventory.markDirty();
             return left;
+        }, hand -> {
+            if (!hand.getItem().canBeNested()) return false; // shulker boxes can't go in a shulker box
+            DefaultedList<ItemStack> now = ShulkerUtil.getContents(box);
+            if (now == null || !now.get(request.innerSlot()).isEmpty()) return false;
+            now.set(request.innerSlot(), hand);
+            ShulkerUtil.setContents(box, now);
+            inventory.markDirty();
+            return true;
         });
     }
 
     /**
      * Gives the player {@code moved} (into the main hand if asked, the old hand item moving to a free slot).
-     * What doesn't fit is handed to {@code putBack}; anything it can't take is dropped. Returns how many the
-     * player got.
+     * With a full inventory, {@code swapIn} may take the old hand item into the slot the item came from (like
+     * TakeItOut trades with a shulker box). What doesn't fit is handed to {@code putBack}; anything it can't take
+     * is dropped. Returns how many the player got.
      */
-    private static int give(ServerPlayerEntity player, ItemStack moved, boolean toHand, UnaryOperator<ItemStack> putBack) {
+    private static int give(ServerPlayerEntity player, ItemStack moved, boolean toHand, UnaryOperator<ItemStack> putBack,
+                            Predicate<ItemStack> swapIn) {
         int amount = moved.getCount();
         PlayerInventory playerInventory = player.getInventory();
-        if (toHand) {
-            int free = playerInventory.getEmptySlot();
-            if (free >= 0 && free < ShulkerUtil.PLAYER_MAIN_SLOTS) {
-                playerInventory.setStack(free, playerInventory.getSelectedStack());
-                playerInventory.setSelectedStack(moved);
-                return amount;
-            }
+        if (toHand && dev.steelaspect.containerautofill.takeitout.ShulkerStackServerHandler.makeRoomForHand(
+                playerInventory, playerInventory.getSelectedStack(), swapIn)) {
+            playerInventory.setSelectedStack(moved);
+            return amount;
         }
         playerInventory.insertStack(moved);
         if (!moved.isEmpty()) {

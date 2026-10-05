@@ -56,6 +56,9 @@
 | C25 | Inventory full | Fill every inventory slot, item only in a shulker | No request is sent. Chat notes that your inventory is full. |
 | C26 | Hotkey outside containers | Press the auto-fill key in your own inventory screen, or with no screen | `Open a container first`, or nothing (the key is GUI-only). |
 | C27–C29 | Enable TakeItOut off | Turn *Enable TakeItOut* off; middle-click real emerald block / Litematica pick a schematic lapis block, both only in a shulker; turn it back on and pick again | Nothing pulled while off; the pick pulls again once it's back on |
+| C30–C33 | Easy place pulls | Selected slot 8 with Pick Blockable Slots 1-5; full inventory (dirt everywhere, lapis only in a shulker); check the hook | Block lands in slot 1-5; fetched with a dirt stack swapped into the box; "Action prevented" skipped while fetching; hook present in WorldUtils and EasyPlaceUtils |
+| C34–C35 | Hand item on a pull, full inventory | 10 cobblestone in hand with a stack of 20 elsewhere; 5 sticks in hand; lapis only in a shulker | Cobblestone merged (30), lapis in hand; sticks went into the shulker box |
+| C36 | Litematica Printer | Printer 3.2.1B in the test run (dev runtime only), print mode on, lapis only in a carried shulker | The printer prints the lapis block (server-side) |
 
 | T1 | Furnace | Schematic furnace with fuel + output; fill | Fuel filled; output slot reported missing (can't insert) |
 | T2–T3 | Smoker, blast furnace | Fill | Fuel slot filled |
@@ -76,6 +79,7 @@
 | S6 | Storage menu | Press `Y` | Menu opens (All Items / Containers / Groups) |
 | S7 | Remote take | Take 10 emeralds from the chest 160 blocks away | Player +10, chest −10 |
 | S8 | Pick block from storage | Middle-click a gold block you only have in a linked chest | Gold block in the main hand |
+| S8b | Pick block from storage, full inventory | Inventory full of cobblestone, gold block only in a linked chest | Gold block in hand; the cobblestone stack went into the chest |
 | P1 | Single-item pull speed | Single-item Mode on; pull 1 stone into an empty hand 10 times | All 10 arrive, ≤ 3 ticks each on average (logged as `SPEED P1`) |
 | P2 | Stale storage cache | The cache says a slot has an item the chest doesn't have; pick it | The request is freed within 5 ticks (not a 3 s wait) and the chest is re-read |
 | P3–P4 | Easy place, single-item mode, buffer 1 | Easy place on, hold right-click at a row of 3 schematic stone blocks, stone only in a linked chest | All 3 placed (time logged as `SPEED P3`); exactly 3 stone taken, none left over |
@@ -83,6 +87,7 @@
 | R1–R3 | Hotbar refill | Place your last cobblestone / dirt / stone with more in the inventory / only in a carried shulker / only in a linked chest | The slot is refilled (10 cobblestone from the inventory, 30 dirt from the shulker, stone from storage) |
 | R4–R5 | Hotbar refill off / drop | Same with Hotbar Refill off; drop the last plank with Q | Slot stays empty, nothing moved |
 | R6 | Hotbar refill with TakeItOut off | Same as R1 with *Enable TakeItOut* off (Hotbar Refill on) | Slot stays empty, nothing moved |
+| W1–W4 | Refill water buckets | Empty a water bucket into a cauldron with another in slot 20 / only in a carried shulker; a lava bucket; then with Refill Water Buckets off | A full bucket is back in the hand and the empty one moved out (from the inventory, from the shulker, lava too); off: the empty bucket stays |
 | K1 | Restock, rest of the mod off | Enable Mod, shulker pick, linked storage, hotbar refill all off; 5 fireworks in the offhand; box named "Restock Fireworks" with 64 | Offhand 64, box keeps 5 |
 | K2 | Restock from ender chest | 10 cobblestone in hotbar slot 3; box named "restock" with 64 in the ender chest | Slot 64, ender box keeps 10 |
 | K3–K4 | Not restocked | Box without the name; a stack of 20 (threshold 16) | Nothing changes |
@@ -97,6 +102,7 @@
 | I1–I5 | Instant fill (`V`) | Double chest: stone loose, iron only in an inventory shulker, emerald/gold/named diamond only in linked chests (one 160 blocks away) | No screen opens; both halves exact; items really moved from shulker and far chest; nothing missing |
 | I6–I7 | Instant fill, wrong items | Hopper with dirt where glass is expected; TNT unavailable | Clear Wrong off: dirt kept, wrong + missing reported. On: dirt to inventory, glass filled |
 | N1–N7 | Shulker boxes in a linked chest | Linked chest holding shulker boxes with lapis, coal blocks, bone blocks (plus 2 loose) and oak logs; nothing else has them | Menu counts the 20 lapis and a take moves 5 out of the box; middle-click a coal block pulls it into the hand; the 2 loose bone blocks go before the boxed ones; `V` on a chest expecting 10 oak logs takes them from the box, and takes nothing with *Use Shulker Boxes* off; every box stays in the chest |
+| M1–M4 | Get Materials | Break the placed hopper and build Litematica's material list; pull 80 bricks, 20 planks, 5 diamonds with a box holding 5 bricks plus an empty box, from a linked chest with 100 loose bricks and a box of 30 planks; then with no boxes | Wants include 1 hopper; boxes end with 85 bricks and 20 planks (chest keeps 20 bricks, its box 10 planks); 5 diamonds reported missing; no boxes: nothing moved, said so |
 
 | Q1–Q3 | Status from the server | Never open the containers | Empty chest reads EMPTY, half-filled hopper PARTIAL; turns CORRECT right after a fill |
 | A1–A3 | Area fill (`Shift`+`V`), range 5 | Two empty schematic chests nearby, one 14 blocks away, a correct hopper, a double chest just out of range | Both nearby filled without opening; far chest and out-of-range double chest untouched; correct hopper skipped |
@@ -106,7 +112,7 @@
 
 | # | Case | Steps | Expected |
 |---|---|---|---|
-| D1 | Only allowed mods | Launch with Fabric API, Litematica, MaLiLib, this mod | Game reaches the title screen; `latest.log` shows `containerautofill 1.3.1` (Cytra Container) loaded |
+| D1 | Only allowed mods | Launch with Fabric API, Litematica, MaLiLib, this mod | Game reaches the title screen; `latest.log` shows `containerautofill 1.3.7` (Cytra Container) loaded |
 | D2 | Litematica missing on the client | Remove Litematica from `mods/` | The game stops at startup with *Cytra Container needs Litematica and MaLiLib on the client: litematica >=0.26.16 is missing* (the same jar on a dedicated server doesn't need them) |
 | D3 | Original mods installed alongside | Add TakeItOut or Litematica-Container-Filler | Fabric refuses to start with a clear "breaks" message naming the conflicting mod |
 
@@ -137,3 +143,9 @@ Record each run here (date, version, environment, pass/fail per case).
 | 2026-10-03 | 1.2.0 (Cytra Container) | Local desktop, client gametests with a display (no Xvfb) | Shulker boxes in linked containers: N1–N7 (menu count + take, pick block into the hand, loose before boxed, instant fill from a box and not with Use Shulker Boxes off, boxes stay put). Full suite 55/55 + 59/59 |
 | 2026-10-03 | 1.3.0 (Cytra Container) | Local desktop, client gametests with a display (no Xvfb) | Box select adds to the selected group (S2). Shared groups G1–G6 (share, listed with owner/size, Add copies, re-share updates, saved in the world folder, Remove); Groups tab screenshot with a shared group checked. Full suite 55/55 + 65/65 |
 | 2026-10-03 | 1.3.1 (Cytra Container) | Local desktop, client gametests with a display (no Xvfb) | Highlight through liquids: H12 (behind water: drawn on top, screenshot checked), H13 (behind stone: not). Full suite 57/57 + 65/65 |
+| 2026-10-04 | 1.3.2 (Cytra Container) | Local desktop, client gametests with a display (no Xvfb) | Refill Water Buckets: W1 (placing water, refilled from the inventory), W2 (cauldron, refilled from a carried shulker), W3 (lava), W4 (off). Full suite 57/57 + 70/70 |
+| 2026-10-04 | 1.3.3 (Cytra Container) | Local desktop, client gametests with a display (no Xvfb) | Easy place pulls: C30–C33, S8b. Full suite 62/62 + 71/71 |
+| 2026-10-04 | 1.3.4 (Cytra Container) | Local desktop, client gametests with a display (no Xvfb) | Hand item moves into the inventory on pulls: C34–C35. Full suite 64/64 + 71/71 |
+| 2026-10-04 | 1.3.5 (Cytra Container) | Local desktop, client gametests with a display, Litematica Printer 3.2.1B loaded | Printer pulls: C36. Full suite 65/65 + 71/71 |
+| 2026-10-04 | 1.3.6 (Cytra Container) | Local desktop, client gametests with a display, Litematica Printer loaded | Get Materials: M1–M4. Full suite 65/65 + 75/75 |
+| 2026-10-04 | 1.3.7 (Cytra Container) | Local desktop: client gametests with and without Litematica Printer (-PwithoutPrinter); dedicated server (runServer -PwithoutPrinter) reaches Done | Without the printer the game starts (C36 checks the hook is left out). Full suite 65/65 + 75/75 both ways |

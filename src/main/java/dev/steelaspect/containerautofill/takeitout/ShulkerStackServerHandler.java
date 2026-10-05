@@ -45,21 +45,24 @@ public final class ShulkerStackServerHandler {
         ItemStack extracted = contents.get(innerSlot);
         if (extracted.isEmpty()) return;
 
-        int freeSlot = inventory.getEmptySlot();
-        if (freeSlot >= 0 && freeSlot < ShulkerUtil.PLAYER_MAIN_SLOTS) {
-            contents.set(innerSlot, ItemStack.EMPTY);
+        contents.set(innerSlot, ItemStack.EMPTY);
+        ItemStack hand = inventory.getSelectedStack();
+        if (makeRoomForHand(inventory, hand, h -> {
+            // Last resort: the hand item goes into the box, in the slot just emptied.
+            if (!h.getItem().canBeNested()) return false;
+            contents.set(innerSlot, h);
+            return true;
+        })) {
             ShulkerUtil.setContents(box, contents);
-            ItemStack previousHand = inventory.getSelectedStack();
-            inventory.setStack(freeSlot, previousHand);
             inventory.setSelectedStack(extracted.copy());
         } else {
+            // Hand item can't go anywhere: trade another block into the box instead (TakeItOut's rule).
             for (int i = ShulkerUtil.PLAYER_MAIN_SLOTS - 1; i >= 0; i--) {
                 ItemStack candidate = inventory.getStack(i);
-                if (!canTradeIntoShulker(candidate)) continue;
-
+                if (i == inventory.getSelectedSlot() || !canTradeIntoShulker(candidate)) continue;
                 contents.set(innerSlot, candidate.copy());
                 ShulkerUtil.setContents(box, contents);
-                inventory.setStack(i, inventory.getSelectedStack());
+                inventory.setStack(i, hand);
                 inventory.setSelectedStack(extracted.copy());
                 break;
             }
@@ -69,7 +72,43 @@ public final class ShulkerStackServerHandler {
         player.currentScreenHandler.sendContentUpdates();
     }
 
-    private static boolean canTradeIntoShulker(ItemStack stack) {
+    /**
+     * Moves the hand item out of the selected slot before something is put there: merged into matching stacks
+     * in the inventory, else into an empty slot, else handed to {@code lastResort} (where the pulled item came from).
+     * Returns false (nothing moved) if none of those can take all of it.
+     */
+    public static boolean makeRoomForHand(PlayerInventory inventory, ItemStack hand, java.util.function.Predicate<ItemStack> lastResort) {
+        if (hand.isEmpty()) return true;
+        int selected = inventory.getSelectedSlot();
+        int room = 0;
+        for (int i = 0; i < ShulkerUtil.PLAYER_MAIN_SLOTS; i++) {
+            ItemStack other = inventory.getStack(i);
+            if (i != selected && ItemStack.areItemsAndComponentsEqual(other, hand)) room += other.getMaxCount() - other.getCount();
+        }
+        int free = -1;
+        for (int i = 0; i < ShulkerUtil.PLAYER_MAIN_SLOTS && free < 0; i++) {
+            if (i != selected && inventory.getStack(i).isEmpty()) free = i;
+        }
+        if (room < hand.getCount() && free < 0) {
+            if (!lastResort.test(hand.copy())) return false;
+            inventory.setSelectedStack(ItemStack.EMPTY);
+            return true;
+        }
+        // The stack itself moves (not a copy): it may be the very shulker box being taken from.
+        ItemStack rest = hand;
+        for (int i = 0; i < ShulkerUtil.PLAYER_MAIN_SLOTS && !rest.isEmpty(); i++) {
+            ItemStack other = inventory.getStack(i);
+            if (i == selected || !ItemStack.areItemsAndComponentsEqual(other, rest)) continue;
+            int n = Math.min(rest.getCount(), other.getMaxCount() - other.getCount());
+            other.increment(n);
+            rest.decrement(n);
+        }
+        if (!rest.isEmpty()) inventory.setStack(free, rest);
+        inventory.setSelectedStack(ItemStack.EMPTY);
+        return true;
+    }
+
+    static boolean canTradeIntoShulker(ItemStack stack) {
         if (stack.isEmpty()) return false;
         if (stack.getItem() instanceof HoeItem || stack.getItem() instanceof AxeItem || stack.getItem() instanceof ShovelItem) return false;
         if (!(stack.getItem() instanceof BlockItem blockItem)) return false;
