@@ -47,7 +47,7 @@ public final class MaterialServerHandler {
             if (ShulkerUtil.isShulkerBox(stack) && stack.getCount() == 1) boxes.add(i);
         }
         List<FillPayloads.Missing> missing = new ArrayList<>();
-        if (boxes.isEmpty()) {
+        if (boxes.isEmpty() && !canSplitBox(inventory)) {
             for (MaterialPayloads.Want want : request.wants()) missing.add(new FillPayloads.Missing(want.kind(), want.count()));
             return new MaterialPayloads.Result(request.requestId(), 0, missing, true, false);
         }
@@ -118,9 +118,43 @@ public final class MaterialServerHandler {
         return new MaterialPayloads.Result(request.requestId(), moved, missing, false, boxesFull);
     }
 
-    /** Puts as much of {@code stack} as fits into the carried boxes: onto matching stacks first, then empty slots. */
+    /** A stack of empty shulker boxes (Carpet's stackable boxes) plus an empty slot to split one into. */
+    private static boolean canSplitBox(PlayerInventory inventory) {
+        return stackedBoxSlot(inventory) >= 0 && inventory.getEmptySlot() >= 0 && inventory.getEmptySlot() < ShulkerUtil.PLAYER_MAIN_SLOTS;
+    }
+
+    private static int stackedBoxSlot(PlayerInventory inventory) {
+        for (int i = 0; i < ShulkerUtil.PLAYER_MAIN_SLOTS; i++) {
+            ItemStack stack = inventory.getStack(i);
+            if (ShulkerUtil.isShulkerBox(stack) && stack.getCount() > 1) {
+                DefaultedList<ItemStack> contents = ShulkerUtil.getContents(stack);
+                if (contents != null && contents.stream().allMatch(ItemStack::isEmpty)) return i;
+            }
+        }
+        return -1;
+    }
+
+    /** Splits one box off a stack of empty boxes into an empty slot, to fill next. Returns false if it can't. */
+    private static boolean splitBox(PlayerInventory inventory, List<Integer> boxes) {
+        if (!canSplitBox(inventory)) return false;
+        int free = inventory.getEmptySlot();
+        inventory.setStack(free, inventory.getStack(stackedBoxSlot(inventory)).split(1));
+        boxes.add(free);
+        return true;
+    }
+
+    /**
+     * Puts as much of {@code stack} as fits into the carried boxes: onto matching stacks first, then empty slots,
+     * then into boxes split off a stack of empty ones while there is inventory space.
+     */
     private static int insertIntoBoxes(PlayerInventory inventory, List<Integer> boxes, ItemStack stack) {
         int total = stack.getCount();
+        fillBoxes(inventory, boxes, stack);
+        while (!stack.isEmpty() && splitBox(inventory, boxes)) fillBoxes(inventory, List.of(boxes.get(boxes.size() - 1)), stack);
+        return total - stack.getCount();
+    }
+
+    private static void fillBoxes(PlayerInventory inventory, List<Integer> boxes, ItemStack stack) {
         for (int emptyPass = 0; emptyPass < 2 && !stack.isEmpty(); emptyPass++) {
             for (int slot : boxes) {
                 if (stack.isEmpty()) break;
@@ -145,6 +179,5 @@ public final class MaterialServerHandler {
                 if (changed) ShulkerUtil.setContents(box, contents);
             }
         }
-        return total - stack.getCount();
     }
 }

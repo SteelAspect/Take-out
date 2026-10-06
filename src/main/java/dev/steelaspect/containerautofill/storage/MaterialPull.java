@@ -29,6 +29,21 @@ public final class MaterialPull {
     private static int nextRequestId;
     private static int pendingId = -1;
     private static MaterialPayloads.Result lastResult;
+    private static List<MaterialPayloads.Want> pendingWants = List.of();
+
+    /**
+     * What earlier pulls already delivered for the current material list, per item, so a second pull (after the
+     * boxes were full and put away) only asks for what's still needed. Blocks placed since then are taken off it.
+     */
+    private record Kind(net.minecraft.item.Item item, net.minecraft.component.ComponentChanges components) {
+        static Kind of(ItemStack stack) {
+            return new Kind(stack.getItem(), stack.getComponentChanges());
+        }
+    }
+
+    private static Object trackedList;
+    private static final java.util.Map<Kind, Integer> DELIVERED = new java.util.HashMap<>();
+    private static final java.util.Map<Kind, Integer> MISSING_AT_DELIVERY = new java.util.HashMap<>();
 
     private MaterialPull() {
     }
@@ -43,11 +58,26 @@ public final class MaterialPull {
 
     /** Material list entries (still missing in the world) minus what the player carries. */
     public static List<MaterialPayloads.Want> wantsFromMaterialList(MinecraftClient client, MaterialListBase list) {
+        if (trackedList != list) {
+            trackedList = list;
+            DELIVERED.clear();
+            MISSING_AT_DELIVERY.clear();
+        }
         List<MaterialPayloads.Want> wants = new ArrayList<>();
         for (MaterialListEntry entry : list.getMaterialsAll()) {
             ItemStack kind = entry.getStack();
             if (kind.isEmpty() || entry.getCountMissing() <= 0) continue;
-            int need = entry.getCountMissing() - carried(client.player.getInventory(), kind);
+            int missing = entry.getCountMissing();
+            Kind key = Kind.of(kind);
+            int delivered = DELIVERED.getOrDefault(key, 0);
+            if (delivered > 0) {
+                // Blocks placed since the delivery came out of what was delivered.
+                int placed = Math.max(0, MISSING_AT_DELIVERY.getOrDefault(key, missing) - missing);
+                delivered = Math.max(0, delivered - placed);
+                DELIVERED.put(key, delivered);
+                MISSING_AT_DELIVERY.put(key, missing);
+            }
+            int need = missing - Math.max(carried(client.player.getInventory(), kind), delivered);
             if (need > 0) wants.add(new MaterialPayloads.Want(kind.copyWithCount(1), need));
             if (wants.size() >= MaterialPayloads.MAX_KINDS) break;
         }
@@ -79,6 +109,7 @@ public final class MaterialPull {
         for (MaterialPayloads.Want want : wants) kinds.add(want.kind());
         List<FillPayloads.Source> sources = pickSources(client, kinds);
         pendingId = ++nextRequestId;
+        pendingWants = List.copyOf(wants);
         ClientPlayNetworking.send(new MaterialPayloads.Request(pendingId, wants, sources));
         message(client, Text.translatable("containerautofill.message.materials_pulling", wants.size()));
     }
@@ -87,6 +118,7 @@ public final class MaterialPull {
         if (result.requestId() != pendingId || client.player == null) return;
         pendingId = -1;
         lastResult = result;
+        rememberDelivered(result);
         StorageActions.refreshAll();
         if (result.noBoxes()) {
             message(client, Text.translatable("containerautofill.message.materials_no_boxes").formatted(Formatting.YELLOW));
@@ -104,6 +136,24 @@ public final class MaterialPull {
         }
     }
 
+    private static void rememberDelivered(MaterialPayloads.Result result) {
+        if (!(trackedList instanceof MaterialListBase list)) return;
+        for (MaterialPayloads.Want want : pendingWants) {
+            int notMoved = 0;
+            for (FillPayloads.Missing missing : result.missing()) {
+                if (ItemStack.areItemsAndComponentsEqual(missing.kind(), want.kind())) notMoved += missing.count();
+            }
+            int moved = Math.max(0, want.count() - notMoved);
+            if (moved <= 0) continue;
+            Kind key = Kind.of(want.kind());
+            DELIVERED.merge(key, moved, Integer::sum);
+            for (MaterialListEntry entry : list.getMaterialsAll()) {
+                if (ItemStack.areItemsAndComponentsEqual(entry.getStack(), want.kind())) MISSING_AT_DELIVERY.put(key, entry.getCountMissing());
+            }
+        }
+        pendingWants = List.of();
+    }
+
     public static MaterialPayloads.Result lastResult() {
         return lastResult;
     }
@@ -114,6 +164,9 @@ public final class MaterialPull {
 
     public static void reset() {
         pendingId = -1;
+        trackedList = null;
+        DELIVERED.clear();
+        MISSING_AT_DELIVERY.clear();
     }
 
     /** Count in the main inventory and inside the shulker boxes carried there. */

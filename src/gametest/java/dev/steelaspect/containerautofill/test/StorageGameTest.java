@@ -1202,6 +1202,51 @@ public class StorageGameTest implements FabricClientGameTest {
         var none = context.computeOnClient(client -> dev.steelaspect.containerautofill.storage.MaterialPull.lastResult());
         check("M4 no shulker boxes carried: nothing moved, said so", none != null && none.noBoxes() && none.moved() == 0
                 && containerCount(world, source, Items.BRICKS) == 20, "result=" + none);
+
+        // M5: only a stack of 3 empty boxes (Carpet's stackable boxes): one is split off into a free slot and filled.
+        setPlayerInventory(world, Map.of(10, new ItemStack(Items.WHITE_SHULKER_BOX, 3)));
+        context.waitTicks(5);
+        var beforeStacked = context.computeOnClient(client -> dev.steelaspect.containerautofill.storage.MaterialPull.lastResult());
+        context.runOnClient(client -> dev.steelaspect.containerautofill.storage.MaterialPull.pull(client, List.of(
+                new dev.steelaspect.containerautofill.network.MaterialPayloads.Want(stack(Items.BRICKS, 1), 15))));
+        try {
+            context.waitFor(client -> dev.steelaspect.containerautofill.storage.MaterialPull.lastResult() != beforeStacked, 100);
+        } catch (Throwable ignored) {
+        }
+        String stacked = world.getServer().computeOnServer(server -> {
+            var inv = player(server).getInventory();
+            StringBuilder b = new StringBuilder();
+            for (int i = 0; i < 36; i++) if (!inv.getStack(i).isEmpty()) b.append(i).append('=').append(inv.getStack(i).getCount()).append(' ');
+            return b.toString();
+        });
+        int splitBricks = 0;
+        for (int i = 0; i < 36; i++) if (i != 10) splitBricks += Math.max(0, innerCount(world, false, i, Items.BRICKS));
+        check("M5 stacked empty boxes: one split off into a free slot and filled (stack 3 -> 2)",
+                splitBricks == 15 && world.getServer().computeOnServer(server -> player(server).getInventory().getStack(10).getCount()) == 2,
+                "inventory=" + stacked + " bricks in split box=" + splitBricks);
+
+        // M6: a second pull after putting the boxes away only asks for what's still needed.
+        world.getServer().runOnServer(server -> {
+            server.getOverworld().setBlockState(fillHopper, Blocks.AIR.getDefaultState());
+            fill(server.getOverworld(), source, Map.of(5, stack(Items.HOPPER, 2)));
+        });
+        setPlayerInventory(world, Map.of(10, new ItemStack(Items.WHITE_SHULKER_BOX)));
+        context.runOnClient(client -> StorageActions.refreshAll());
+        context.waitTicks(30);
+        var firstWants = context.computeOnClient(client -> dev.steelaspect.containerautofill.storage.MaterialPull.wantsFromMaterialList(client, DataManager.getMaterialList()));
+        var beforeHopper = context.computeOnClient(client -> dev.steelaspect.containerautofill.storage.MaterialPull.lastResult());
+        context.runOnClient(client -> dev.steelaspect.containerautofill.storage.MaterialPull.pull(client, firstWants));
+        try {
+            context.waitFor(client -> dev.steelaspect.containerautofill.storage.MaterialPull.lastResult() != beforeHopper, 100);
+        } catch (Throwable ignored) {
+        }
+        setPlayerInventory(world, Map.of()); // boxes put away
+        context.waitTicks(5);
+        var secondWants = context.computeOnClient(client -> dev.steelaspect.containerautofill.storage.MaterialPull.wantsFromMaterialList(client, DataManager.getMaterialList()));
+        check("M6 second pull: the hopper already delivered isn't asked for again",
+                firstWants.stream().anyMatch(w -> w.kind().isOf(Items.HOPPER)) && secondWants.stream().noneMatch(w -> w.kind().isOf(Items.HOPPER)),
+                "first=" + firstWants + " second=" + secondWants);
+        world.getServer().runOnServer(server -> server.getOverworld().setBlockState(fillHopper, Blocks.HOPPER.getDefaultState()));
         context.runOnClient(client -> StorageStore.remove(StorageStore.find(overworld, source)));
     }
 

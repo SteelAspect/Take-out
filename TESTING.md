@@ -103,6 +103,7 @@
 | I6–I7 | Instant fill, wrong items | Hopper with dirt where glass is expected; TNT unavailable | Clear Wrong off: dirt kept, wrong + missing reported. On: dirt to inventory, glass filled |
 | N1–N7 | Shulker boxes in a linked chest | Linked chest holding shulker boxes with lapis, coal blocks, bone blocks (plus 2 loose) and oak logs; nothing else has them | Menu counts the 20 lapis and a take moves 5 out of the box; middle-click a coal block pulls it into the hand; the 2 loose bone blocks go before the boxed ones; `V` on a chest expecting 10 oak logs takes them from the box, and takes nothing with *Use Shulker Boxes* off; every box stays in the chest |
 | M1–M4 | Get Materials | Break the placed hopper and build Litematica's material list; pull 80 bricks, 20 planks, 5 diamonds with a box holding 5 bricks plus an empty box, from a linked chest with 100 loose bricks and a box of 30 planks; then with no boxes | Wants include 1 hopper; boxes end with 85 bricks and 20 planks (chest keeps 20 bricks, its box 10 planks); 5 diamonds reported missing; no boxes: nothing moved, said so |
+| M5–M6 | Get Materials: stacked boxes, second pull | Only a stack of 3 empty boxes; then pull the missing hopper, put the boxes away and build the list again | A box is split off (stack 3 -> 2) and holds the 15 bricks; the second list doesn't ask for the hopper again |
 
 | Q1–Q3 | Status from the server | Never open the containers | Empty chest reads EMPTY, half-filled hopper PARTIAL; turns CORRECT right after a fill |
 | A1–A3 | Area fill (`Shift`+`V`), range 5 | Two empty schematic chests nearby, one 14 blocks away, a correct hopper, a double chest just out of range | Both nearby filled without opening; far chest and out-of-range double chest untouched; correct hopper skipped |
@@ -112,7 +113,7 @@
 
 | # | Case | Steps | Expected |
 |---|---|---|---|
-| D1 | Only allowed mods | Launch with Fabric API, Litematica, MaLiLib, this mod | Game reaches the title screen; `latest.log` shows `containerautofill 1.3.7` (Cytra Container) loaded |
+| D1 | Only allowed mods | Launch with Fabric API, Litematica, MaLiLib, this mod | Game reaches the title screen; `latest.log` shows `containerautofill 1.3.8` (Cytra Container) loaded |
 | D2 | Litematica missing on the client | Remove Litematica from `mods/` | The game stops at startup with *Cytra Container needs Litematica and MaLiLib on the client: litematica >=0.26.16 is missing* (the same jar on a dedicated server doesn't need them) |
 | D3 | Original mods installed alongside | Add TakeItOut or Litematica-Container-Filler | Fabric refuses to start with a clear "breaks" message naming the conflicting mod |
 
@@ -149,3 +150,4 @@ Record each run here (date, version, environment, pass/fail per case).
 | 2026-10-04 | 1.3.5 (Cytra Container) | Local desktop, client gametests with a display, Litematica Printer 3.2.1B loaded | Printer pulls: C36. Full suite 65/65 + 71/71 |
 | 2026-10-04 | 1.3.6 (Cytra Container) | Local desktop, client gametests with a display, Litematica Printer loaded | Get Materials: M1–M4. Full suite 65/65 + 75/75 |
 | 2026-10-04 | 1.3.7 (Cytra Container) | Local desktop: client gametests with and without Litematica Printer (-PwithoutPrinter); dedicated server (runServer -PwithoutPrinter) reaches Done | Without the printer the game starts (C36 checks the hook is left out). Full suite 65/65 + 75/75 both ways |
+| 2026-10-06 | 1.3.8 (Cytra Container) | Local desktop, client gametests with Litematica Printer | Get Materials M5–M6. Full suite 65/65 + 77/77 |
