@@ -189,12 +189,73 @@ public final class StorageServerHandler {
         ItemStack source = player.getInventory().getStack(request.playerSlot());
         if (source.isEmpty()) return;
         int amount = Math.min(request.count(), source.getCount());
-        ItemStack remainder = HopperBlockEntity.transfer(null, inventory, source.copyWithCount(amount), null);
+        ItemStack remainder = intoShulkers(inventory, source.copyWithCount(amount));
+        remainder = HopperBlockEntity.transfer(null, inventory, remainder, null);
         int moved = amount - remainder.getCount();
         if (moved > 0) {
             source.decrement(moved);
             inventory.markDirty();
             player.getInventory().markDirty();
+        }
+    }
+
+    /**
+     * Dumping: puts items into single shulker boxes lying in the container first (matching stacks, then empty box
+     * slots); returns what didn't fit. Shulker boxes and other items that can't be nested are returned untouched.
+     */
+    static ItemStack intoShulkers(Inventory inventory, ItemStack moving) {
+        if (moving.isEmpty() || !moving.getItem().canBeNested()) return moving;
+        fillSingleBoxes(inventory, moving);
+        // Single boxes full: split a box off a stack of empty ones (Carpet's stackable boxes) into a free slot.
+        while (!moving.isEmpty() && splitBox(inventory)) fillSingleBoxes(inventory, moving);
+        return moving;
+    }
+
+    private static boolean splitBox(Inventory inventory) {
+        int stacked = -1;
+        int free = -1;
+        for (int i = 0; i < inventory.size(); i++) {
+            ItemStack stack = inventory.getStack(i);
+            if (stack.isEmpty()) {
+                if (free < 0) free = i;
+            } else if (stacked < 0 && stack.getCount() > 1 && ShulkerUtil.isShulkerBox(stack)) {
+                DefaultedList<ItemStack> contents = ShulkerUtil.getContents(stack);
+                if (contents != null && contents.stream().allMatch(ItemStack::isEmpty)) stacked = i;
+            }
+        }
+        if (stacked < 0 || free < 0) return false;
+        inventory.setStack(free, inventory.getStack(stacked).split(1));
+        inventory.markDirty();
+        return true;
+    }
+
+    private static void fillSingleBoxes(Inventory inventory, ItemStack moving) {
+        for (int pass = 0; pass < 2 && !moving.isEmpty(); pass++) {
+            for (int i = 0; i < inventory.size() && !moving.isEmpty(); i++) {
+                ItemStack box = inventory.getStack(i);
+                // Stacked boxes share one contents component, so only single boxes are filled.
+                if (box.getCount() != 1) continue;
+                DefaultedList<ItemStack> contents = ShulkerUtil.getContents(box);
+                if (contents == null) continue;
+                boolean changed = false;
+                for (int j = 0; j < contents.size() && !moving.isEmpty(); j++) {
+                    ItemStack there = contents.get(j);
+                    if (pass == 0 && ItemStack.areItemsAndComponentsEqual(there, moving) && there.getCount() < there.getMaxCount()) {
+                        int n = Math.min(moving.getCount(), there.getMaxCount() - there.getCount());
+                        there.increment(n);
+                        moving.decrement(n);
+                        changed = true;
+                    } else if (pass == 1 && there.isEmpty()) {
+                        int n = Math.min(moving.getCount(), moving.getMaxCount());
+                        contents.set(j, moving.split(n));
+                        changed = true;
+                    }
+                }
+                if (changed) {
+                    ShulkerUtil.setContents(box, contents);
+                    inventory.markDirty();
+                }
+            }
         }
     }
 

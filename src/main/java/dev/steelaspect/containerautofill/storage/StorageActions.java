@@ -306,9 +306,30 @@ public final class StorageActions {
             for (ItemStack inside : snapshot.items().values()) {
                 if (ItemStack.areItemsAndComponentsEqual(inside, stack) && inside.getCount() < inside.getMaxCount()) return entry;
             }
+            // The server fills shulker boxes inside dump containers first.
+            if (hasBoxRoom(snapshot, stack)) return entry;
             if (withSpace == null && snapshot.items().size() < 27) withSpace = entry;
         }
         return withSpace != null ? withSpace : dumps.get(0);
+    }
+
+    /** True if a shulker box in the container can take this item (single box with room, or a stack of empty boxes to split). */
+    public static boolean hasBoxRoom(StorageContents.Snapshot snapshot, ItemStack stack) {
+        if (!stack.getItem().canBeNested()) return false;
+        boolean freeSlot = snapshot.items().size() < 27;
+        for (ItemStack box : snapshot.items().values()) {
+            DefaultedList<ItemStack> contents = ShulkerUtil.getContents(box);
+            if (contents == null) continue;
+            // A stack of empty boxes (Carpet's stackable boxes): the server splits one off into a free slot.
+            if (box.getCount() > 1) {
+                if (freeSlot && contents.stream().allMatch(ItemStack::isEmpty)) return true;
+                continue;
+            }
+            for (ItemStack inner : contents) {
+                if (inner.isEmpty() || (ItemStack.areItemsAndComponentsEqual(inner, stack) && inner.getCount() < inner.getMaxCount())) return true;
+            }
+        }
+        return false;
     }
 
     // ---------------------------------------------------------------- look at

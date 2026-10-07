@@ -813,6 +813,93 @@ public class StorageGameTest implements FabricClientGameTest {
                 && containerCount(world, dumpChest, Items.DIRT) == 10, "cobble=" + containerCount(world, dumpChest, Items.COBBLESTONE)
                 + " dirt=" + containerCount(world, dumpChest, Items.DIRT));
         check("S9 hotbar is not dumped", serverCount(world, s -> s.isOf(Items.TORCH)) == 5, "torches moved");
+
+        // Shulker boxes inside the dump container are filled first; a carried box goes in loose.
+        world.getServer().runOnServer(server -> {
+            Inventory chest = (Inventory) server.getOverworld().getBlockEntity(dumpChest);
+            chest.clear();
+            ItemStack box = stack(Items.WHITE_SHULKER_BOX, 1);
+            net.minecraft.util.collection.DefaultedList<ItemStack> inner = net.minecraft.util.collection.DefaultedList.ofSize(27, ItemStack.EMPTY);
+            inner.set(0, stack(Items.COBBLESTONE, 10));
+            dev.steelaspect.containerautofill.takeitout.ShulkerUtil.setContents(box, inner);
+            chest.setStack(0, box);
+            chest.markDirty();
+            PlayerInventory inv = player(server).getInventory();
+            inv.clear();
+            inv.setStack(9, stack(Items.COBBLESTONE, 64));
+            inv.setStack(10, stack(Items.DIRT, 10));
+            inv.setStack(11, stack(Items.RED_SHULKER_BOX, 1));
+        });
+        context.waitTicks(5);
+        context.runOnClient(client -> StorageContents.requestOne(overworld, dumpChest));
+        context.waitTicks(10);
+        context.getInput().pressKey(GLFW.GLFW_KEY_N);
+        context.waitTicks(30);
+        String result = world.getServer().computeOnServer(server -> {
+            Inventory chest = (Inventory) server.getOverworld().getBlockEntity(dumpChest);
+            net.minecraft.util.collection.DefaultedList<ItemStack> inner = dev.steelaspect.containerautofill.takeitout.ShulkerUtil.getContents(chest.getStack(0));
+            int cobble = 0;
+            int dirt = 0;
+            for (ItemStack st : inner) {
+                if (st.isOf(Items.COBBLESTONE)) cobble += st.getCount();
+                if (st.isOf(Items.DIRT)) dirt += st.getCount();
+            }
+            int loose = 0;
+            boolean redBox = false;
+            for (int i = 1; i < chest.size(); i++) {
+                if (chest.getStack(i).isOf(Items.RED_SHULKER_BOX)) redBox = true;
+                else if (!chest.getStack(i).isEmpty()) loose++;
+            }
+            return cobble + "/" + dirt + "/" + loose + "/" + redBox;
+        });
+        check("S9c dump fills shulker boxes in the dump container (74 cobble, 10 dirt in the box; carried box loose)",
+                result.equals("74/10/0/true"), "boxCobble/boxDirt/otherLoose/redBoxLoose=" + result);
+
+        // Stacked empty boxes (Carpet): single boxes full -> one box is split off into a free slot and filled.
+        world.getServer().runOnServer(server -> {
+            Inventory chest = (Inventory) server.getOverworld().getBlockEntity(dumpChest);
+            chest.clear();
+            ItemStack full = stack(Items.WHITE_SHULKER_BOX, 1);
+            net.minecraft.util.collection.DefaultedList<ItemStack> inner = net.minecraft.util.collection.DefaultedList.ofSize(27, ItemStack.EMPTY);
+            for (int k = 0; k < 27; k++) inner.set(k, stack(Items.STONE, 64));
+            dev.steelaspect.containerautofill.takeitout.ShulkerUtil.setContents(full, inner);
+            chest.setStack(0, full);
+            chest.setStack(1, stack(Items.LIGHT_GRAY_SHULKER_BOX, 1));
+            chest.getStack(1).setCount(4); // chests cap setStack at 1; Carpet stacks them in place
+            chest.markDirty();
+            PlayerInventory inv = player(server).getInventory();
+            inv.clear();
+            inv.setStack(9, stack(Items.COBBLESTONE, 64));
+            inv.setStack(10, stack(Items.DIRT, 10));
+        });
+        context.waitTicks(5);
+        context.runOnClient(client -> StorageContents.requestOne(overworld, dumpChest));
+        context.waitTicks(10);
+        context.getInput().pressKey(GLFW.GLFW_KEY_N);
+        context.waitTicks(30);
+        String split = world.getServer().computeOnServer(server -> {
+            Inventory chest = (Inventory) server.getOverworld().getBlockEntity(dumpChest);
+            int stackLeft = chest.getStack(1).getCount();
+            int cobble = 0;
+            int dirt = 0;
+            int looseItems = 0;
+            for (int i = 2; i < chest.size(); i++) {
+                ItemStack st = chest.getStack(i);
+                if (st.isEmpty()) continue;
+                net.minecraft.util.collection.DefaultedList<ItemStack> c = dev.steelaspect.containerautofill.takeitout.ShulkerUtil.getContents(st);
+                if (c == null) {
+                    looseItems++;
+                    continue;
+                }
+                for (ItemStack in : c) {
+                    if (in.isOf(Items.COBBLESTONE)) cobble += in.getCount();
+                    if (in.isOf(Items.DIRT)) dirt += in.getCount();
+                }
+            }
+            return stackLeft + "/" + cobble + "/" + dirt + "/" + looseItems;
+        });
+        check("S9d stacked empty boxes: one split off and filled (stack 4 -> 3, 64 cobble + 10 dirt in it, nothing loose)",
+                split.equals("3/64/10/0"), "stackLeft/cobble/dirt/loose=" + split);
     }
 
     private Map<Integer, ItemStack> contents(TestSingleplayerContext world, BlockPos pos) {
