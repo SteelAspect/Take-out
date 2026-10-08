@@ -143,6 +143,17 @@ Keeps your hotbar and offhand stacks topped up from **restock shulker boxes**: s
 | From Ender Chest | on | Use restock boxes in your ender chest. |
 | Warn When Empty | on | Message when a restocked item runs out. |
 
+### 7. Container contents material list
+Litematica's material list for a placement gets a **Contents** button in its bottom row. Click it to switch the list (right click goes back):
+
+- **Blocks**: Litematica's normal list.
+- **Containers**: everything that goes *inside* the schematic's containers (chests, barrels, shulker boxes, hoppers, furnaces...). A shulker box in a container counts as the box plus everything in it, so a chest of 27 boxes of redstone shows the redstone too.
+- **Both**: blocks and container contents added together.
+
+*Missing* is counted per container: what the schematic wants minus what the real container already holds. Real contents are known once you've opened the container, in singleplayer, or through Servux; a container you haven't seen counts as empty. *Available* is what you carry, like any material list.
+
+The selected list becomes Litematica's active material list, so its **Info HUD** (and Get Materials) use it too, and the HUD stays on when you switch. Only placement material lists have the button (not lists of a schematic file or the area analyzer).
+
 ## Hotkeys
 
 | Hotkey | Default | Notes |

@@ -92,8 +92,23 @@ public final class SchematicContainerIndex {
 
         for (SchematicPlacement placement : manager.getAllSchematicsPlacements()) {
             if (placement == null || !placement.isEnabled()) continue;
+            collect(placement, registries, result);
+        }
+        return Collections.unmodifiableMap(result);
+    }
+
+    /** The containers of one placement (enabled or not), by world position. Used by the container material list. */
+    public static Map<BlockPos, SchematicContainerReader.Single> forPlacement(SchematicPlacement placement,
+                                                                             RegistryWrapper.WrapperLookup registries) {
+        Map<BlockPos, SchematicContainerReader.Single> result = new HashMap<>();
+        if (placement != null) collect(placement, registries, result);
+        return result;
+    }
+
+    private static void collect(SchematicPlacement placement, RegistryWrapper.WrapperLookup registries,
+                                Map<BlockPos, SchematicContainerReader.Single> result) {
             LitematicaSchematic schematic = placement.getSchematic();
-            if (schematic == null) continue;
+            if (schematic == null) return;
 
             for (String regionName : placement.getSubRegionBoxes(SubRegionPlacement.RequiredEnabled.PLACEMENT_ENABLED).keySet()) {
                 SubRegionPlacement regionPlacement = placement.getRelativeSubRegionPlacement(regionName);
@@ -115,8 +130,6 @@ public final class SchematicContainerIndex {
                     result.putIfAbsent(worldPos.toImmutable(), SchematicContainerReader.fromNbt(state, nbt, registries));
                 }
             }
-        }
-        return Collections.unmodifiableMap(result);
     }
 
     private static final Map<BlockState, Boolean> INVENTORY_BLOCKS = new java.util.concurrent.ConcurrentHashMap<>();

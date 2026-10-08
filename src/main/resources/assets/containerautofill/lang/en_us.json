@@ -249,5 +249,7 @@
   "containerautofill.message.materials_pulling": "Getting %s kinds of materials from linked containers...",
   "containerautofill.message.materials_no_boxes": "No shulker boxes in your inventory to put the materials in",
   "containerautofill.message.materials_done": "Moved %s items into your shulker boxes; %s kinds (%s items) still missing",
-  "containerautofill.message.materials_boxes_full": "Your shulker boxes are full; bring more empty ones for the rest"
+  "containerautofill.message.materials_boxes_full": "Your shulker boxes are full; bring more empty ones for the rest",
+  "containerautofill.gui.button.material_contents": "Contents: %s",
+  "containerautofill.gui.button.hover.material_contents": "Blocks: Litematica's normal list\nContainers: what goes inside the schematic's containers\n(shulker boxes count with their contents; missing = not in the real container yet)\nBoth: blocks and container contents together\nRight click to go back. The material list HUD shows the selected list."
 }

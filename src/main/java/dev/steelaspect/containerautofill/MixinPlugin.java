@@ -52,6 +52,9 @@ public class MixinPlugin implements IMixinConfigPlugin {
         if (loader.isModLoaded("litematica")) {
             mixins.add("LitematicaEasyPlaceMessageMixin");
             mixins.add("LitematicaInventoryUtilsMixin");
+            mixins.add("LitematicaGuiMaterialListMixin");
+            mixins.add("MaterialListPlacementAccessor");
+            mixins.add("GuiBaseAccessor");
         }
         if (loader.isModLoaded("litematica_printer")) mixins.add("PrinterGuideMixin");
         return mixins;

@@ -1,0 +1,19 @@
+/*
+ * Cytra Container
+ * Copyright (C) 2026 steelaspect
+ * SPDX-License-Identifier: LGPL-3.0-only
+ */
+package dev.steelaspect.containerautofill.mixin;
+
+import fi.dy.masa.malilib.gui.GuiBase;
+import fi.dy.masa.malilib.gui.button.ButtonBase;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.gen.Accessor;
+
+import java.util.List;
+
+@Mixin(value = GuiBase.class, remap = false)
+public interface GuiBaseAccessor {
+    @Accessor("buttons")
+    List<ButtonBase> containerautofill$getButtons();
+}
